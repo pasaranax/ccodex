@@ -9,7 +9,7 @@ const artifacts = readdirSync(directory).filter((name) => name.endsWith(".tgz"))
   return { name: basename(name), bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
 });
 if (artifacts.length !== 4) throw new Error(`Expected 4 npm artifacts, found ${artifacts.length}`);
-const manifest = { schemaVersion: 1, package: "@gkorepanov/ccodex", version: main.version, claudeAgentSdk: main.dependencies["@anthropic-ai/claude-agent-sdk"], artifacts };
+const manifest = { schemaVersion: 1, package: "@pasaranax/ccodex", version: main.version, claudeAgentSdk: main.dependencies["@anthropic-ai/claude-agent-sdk"], artifacts };
 writeFileSync(join(directory, "release-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 writeFileSync(join(directory, "SHA256SUMS"), `${artifacts.map((item) => `${item.sha256}  ${item.name}`).join("\n")}\n`);
 console.log(`Generated release manifest for ${artifacts.length} npm artifacts.`);

@@ -22,7 +22,7 @@ const sbom = {
   specVersion: "1.5",
   serialNumber: `urn:uuid:${randomUUID()}`,
   version: 1,
-  metadata: { component: { type: "application", name: "@gkorepanov/ccodex-relay", version: productVersion } },
+  metadata: { component: { type: "application", name: "@pasaranax/ccodex-relay", version: productVersion } },
   components,
 };
 writeFileSync(output, `${JSON.stringify(sbom, null, 2)}\n`);

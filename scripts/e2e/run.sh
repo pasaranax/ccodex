@@ -9,8 +9,8 @@ VERSION=$(node -p "require('$ROOT/package.json').version")
 if [ "${E2E_SKIP_BUILD:-0}" != 1 ]; then
   (cd "$ROOT" && npm pack --silent --pack-destination "$WORK" >/dev/null)
   (cd "$ROOT/packages/relay-linux-x64-gnu" && npm pack --silent --pack-destination "$WORK" >/dev/null)
-  cp "$WORK/gkorepanov-ccodex-$VERSION.tgz" "$ROOT/scripts/e2e/ccodex.tgz"
-  cp "$WORK/gkorepanov-ccodex-relay-linux-x64-gnu-$VERSION.tgz" "$ROOT/scripts/e2e/relay.tgz"
+  cp "$WORK/pasaranax-ccodex-$VERSION.tgz" "$ROOT/scripts/e2e/ccodex.tgz"
+  cp "$WORK/pasaranax-ccodex-relay-linux-x64-gnu-$VERSION.tgz" "$ROOT/scripts/e2e/relay.tgz"
   podman build -q -t ccodex-e2e --build-arg CODEX_VERSION="${E2E_CODEX_VERSION:-latest}" --build-arg CCODEX_VERSION="$VERSION" -f "$ROOT/scripts/e2e/Containerfile" "$ROOT/scripts/e2e" >/dev/null
   rm -f "$ROOT/scripts/e2e/ccodex.tgz" "$ROOT/scripts/e2e/relay.tgz"
   # Each build leaves the previous image dangling (and podman 3.4 its interrupted layers): drop them.

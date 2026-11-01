@@ -119,11 +119,11 @@ jobs:
       - name: Publish platform packages first
         env:
           DIST_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || 'latest' }}
-        run: node release/publish-tarballs.mjs "$DIST_TAG" release-artifacts/gkorepanov-ccodex-relay-*.tgz
+        run: node release/publish-tarballs.mjs "$DIST_TAG" release-artifacts/pasaranax-ccodex-relay-*.tgz
       - name: Publish main package
         env:
           DIST_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || 'latest' }}
-        run: node release/publish-tarballs.mjs "$DIST_TAG" "release-artifacts/gkorepanov-ccodex-$(node -p 'require("./package.json").version').tgz"
+        run: node release/publish-tarballs.mjs "$DIST_TAG" "release-artifacts/pasaranax-ccodex-$(node -p 'require("./package.json").version').tgz"
 
   github-release:
     needs: publish
@@ -138,11 +138,11 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
-          name: release-metadata
-          path: release-metadata
+          path: release-artifacts
+          merge-multiple: true
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" release-metadata/* --verify-tag --notes-from-tag
+        run: gh release create "${GITHUB_REF_NAME}" release-artifacts/* --verify-tag --notes-from-tag
 
   sync-lockfile:
     # release:version regenerates the lockfile while the new relay packages are

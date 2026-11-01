@@ -12,4 +12,4 @@ command -v npx >/dev/null 2>&1 || {
   printf 'CCodex uninstall needs Node/npm. Install Node.js 22 or 24 LTS, then rerun this command.\n' >&2
   exit 1
 }
-npx --yes --package @gkorepanov/ccodex ccodex uninstall $purge
+npx --yes --package @pasaranax/ccodex ccodex uninstall $purge

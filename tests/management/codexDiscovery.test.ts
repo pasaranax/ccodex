@@ -30,6 +30,16 @@ describe("the stock codex CCodex runs", () => {
     expect(findInstalledCodex()).toBe(npm);
   });
 
+  it.each(["@gkorepanov", "@pasaranax"])("skips a global %s/ccodex launcher when finding stock Codex", (scope) => {
+    const launcher = executable(join(root, "global", "node_modules", scope, "ccodex", "dist", "cli", "main.js"));
+    const globalBin = join(root, "global-bin");
+    mkdirSync(globalBin);
+    symlinkSync(launcher, join(globalBin, "codex"));
+    const stock = executable(join(root, "stock-bin", "codex"));
+    process.env.PATH = [globalBin, join(root, "stock-bin")].join(":");
+    expect(findInstalledCodex()).toBe(stock);
+  });
+
   it("at ~/.local/bin, where CCodex took the installer's link, is the codex the installer put there", () => {
     const standalone = executable(join(root, "codex-home", "packages", "standalone", "current", "bin", "codex"));
     mkdirSync(join(root, "ccodex", "backups"));

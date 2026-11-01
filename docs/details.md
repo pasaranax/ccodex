@@ -81,7 +81,7 @@ mcp-server`, removed from Codex in `0.154`, is served by CCodex on top of `codex
 Uninstall stops CCodex's gateway and undoes the `PATH`, `~/.local/bin/codex` and
 `CODEX_CLI_PATH` changes; what setup added to `~/.claude` stays. If `ccodex` is gone from
 `PATH`, use the release's `uninstall.sh` (`… | sh -s -- --purge` to purge):
-`curl -fsSL https://github.com/gkorepanov/ccodex/releases/latest/download/uninstall.sh | sh`
+`curl -fsSL https://github.com/pasaranax/ccodex/releases/latest/download/uninstall.sh | sh`
 
 ## Upgrading from 0.4
 
@@ -122,7 +122,7 @@ Claude's 30-day cleanup deleted come back as text. The 0.4 databases move to
 ## Troubleshooting
 
 - `ccodex doctor` checks Node, Codex and Claude and their logins, the prebuilt native
-  relay (`@gkorepanov/ccodex-relay-*`), the gateway and the install, and says what to run. It warns when npm has a
+  relay (`@pasaranax/ccodex-relay-*`), the gateway and the install, and says what to run. It warns when npm has a
   newer Codex: `ccodex update` updates an npm global install of Codex along with CCodex (a Desktop update can need
   a newer Codex on a host the App reaches over SSH).
 - The gateway's log is `~/.codex/app-server-daemon/app-server.stderr.log`, rewritten at
@@ -146,6 +146,55 @@ npm run check
 npm test                  # unit and black-box gateway tests, relay tests
 scripts/e2e/run.sh        # rootless podman, real models, copies of your credentials
 ```
+
+## Fork releases
+
+This fork publishes `@pasaranax/ccodex` and its three `@pasaranax/ccodex-relay-*`
+packages from `pasaranax/ccodex`. All four use the same version, starting at
+`0.5.20-pasaranax.1`. `ccodex update` follows this fork's `latest` npm tag;
+`ccodex update --next` follows its `next` tag. New upstream changes are merged,
+tested, and released here before users receive them.
+
+For the first publication, push the prepared branch, then run the **Release npm
+packages** workflow on it with **publish = false**. Download the verified artifacts:
+
+```sh
+gh run download RUN_ID --repo pasaranax/ccodex --dir artifacts/bootstrap
+```
+
+From an npm-authenticated terminal, publish the three relay packages before the
+main package. The first local publication disables CI provenance for that command:
+
+```sh
+node release/publish-tarballs.mjs latest --no-provenance \
+  artifacts/bootstrap/relay-*/*.tgz artifacts/bootstrap/ccodex-main/*.tgz
+```
+
+On npmjs.com, configure **Trusted publishing** for each of the four packages:
+GitHub owner `pasaranax`, repository `ccodex`, workflow `release.yml`, environment
+`npm`. Later releases use GitHub Actions OIDC and generate provenance there.
+
+Finish the first release by creating an annotated `v0.5.20-pasaranax.1` tag on the
+tested commit and pushing it to the fork. Its workflow skips the npm versions
+already published above and creates the GitHub Release with the installer and
+all four tarballs. The README's installer link starts working after this step.
+
+Validate each new trusted publisher by publishing a new version through the
+workflow within two days. Skipping an already-published version does not validate
+OIDC. Use the subsequent-release steps below for that next version.
+
+For each subsequent release, merge the upstream changes and local fixes, run the
+checks, and choose a new version such as `0.5.20-pasaranax.2`:
+
+```sh
+npm run release:version -- 0.5.20-pasaranax.2
+```
+
+After committing the version change, an annotated `vVERSION` tag pushed to the
+fork builds and publishes all four packages and creates the GitHub Release with
+the installer, tarballs, checksums, and dependency metadata. The workflow refreshes
+the lockfile after the new platform packages reach npm. Promote a tested `next`
+release with `npm run release:promote -- VERSION --execute` when needed.
 
 ## License
 

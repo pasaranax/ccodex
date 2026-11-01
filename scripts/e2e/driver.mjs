@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { crc32, deflateSync } from "node:zlib";
 
 const HOME = homedir();
-const PACKAGE = join(HOME, ".ccodex", "current", "node_modules", "@gkorepanov", "ccodex");
+const PACKAGE = join(HOME, ".ccodex", "current", "node_modules", "@pasaranax", "ccodex");
 const require = createRequire(join(PACKAGE, "package.json"));
 const WebSocket = require("ws");
 const SOCKET = join(HOME, ".codex", "app-server-control", "app-server-control.sock");

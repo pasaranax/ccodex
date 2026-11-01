@@ -1,14 +1,14 @@
 {
-  "name": "@gkorepanov/ccodex",
-  "version": "0.5.20",
-  "description": "Unofficial Codex App compatibility bridge for Codex CLI and Claude Code runtimes.",
-  "homepage": "https://github.com/gkorepanov/ccodex#readme",
+  "name": "@pasaranax/ccodex",
+  "version": "0.5.20-pasaranax.1",
+  "description": "Personal CCodex fork with native MCP, model discovery, macOS Node, and daemon recovery fixes.",
+  "homepage": "https://github.com/pasaranax/ccodex#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gkorepanov/ccodex.git"
+    "url": "git+https://github.com/pasaranax/ccodex.git"
   },
   "bugs": {
-    "url": "https://github.com/gkorepanov/ccodex/issues"
+    "url": "https://github.com/pasaranax/ccodex/issues"
   },
   "private": false,
   "license": "MIT",
@@ -66,9 +66,9 @@
     "ws": "8.21.0"
   },
   "optionalDependencies": {
-    "@gkorepanov/ccodex-relay-darwin-arm64": "0.5.20",
-    "@gkorepanov/ccodex-relay-linux-arm64-gnu": "0.5.20",
-    "@gkorepanov/ccodex-relay-linux-x64-gnu": "0.5.20"
+    "@pasaranax/ccodex-relay-darwin-arm64": "0.5.20-pasaranax.1",
+    "@pasaranax/ccodex-relay-linux-arm64-gnu": "0.5.20-pasaranax.1",
+    "@pasaranax/ccodex-relay-linux-x64-gnu": "0.5.20-pasaranax.1"
   },
   "devDependencies": {
     "@openai/codex": "0.156.0",

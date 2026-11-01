@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-package='@gkorepanov/ccodex'
+package='@pasaranax/ccodex'
 home=${CCODEX_HOME:-"$HOME/.ccodex"}
 
 fail() {

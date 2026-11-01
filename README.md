@@ -15,10 +15,15 @@ Claude Code with your own Claude subscription, and GPT chats keep running on you
 as before. It works in the desktop app, on servers you open over SSH, and from the
 ChatGPT app on your phone.
 
+This is [pasaranax's fork](https://github.com/pasaranax/ccodex) of
+[gkorepanov/ccodex](https://github.com/gkorepanov/ccodex), distributed as `@pasaranax/ccodex`.
+It includes fixes for Claude model discovery, macOS Node launchers, daemon lock recovery,
+and an opt-in native MCP bridge. Installation and `ccodex update` follow this fork's releases.
+
 **Install**
 
 ```sh
-curl -fsSL https://github.com/gkorepanov/ccodex/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/pasaranax/ccodex/releases/latest/download/install.sh | sh
 ```
 
 **Update**
@@ -31,7 +36,7 @@ Then quit and reopen the ChatGPT desktop app.
 
 > [!NOTE]
 > An unofficial community project, not affiliated with OpenAI or Anthropic. It's young,
-> so expect bugs, and please [report them](https://github.com/gkorepanov/ccodex/issues).
+> so expect bugs, and please [report them](https://github.com/pasaranax/ccodex/issues).
 
 ## What you get
 
@@ -61,8 +66,8 @@ You need macOS on Apple silicon or Linux (x64 or arm64, glibc 2.31+), with Node.
 The installer adds Codex if it's missing, and Claude Code comes with CCodex.
 
 1. **Install** with the command above, or with
-   `npm install -g @gkorepanov/ccodex && ccodex setup`. Run it as your normal user, not
-   with `sudo`.
+   `npx --yes --package @pasaranax/ccodex@latest ccodex setup`. This also switches an
+   existing upstream install to this fork. Run it as your normal user, without `sudo`.
 2. **Log in** to whatever you aren't logged in to yet: `ccodex auth codex`,
    `ccodex auth claude`.
 3. **Restart.** Open a new shell and run `codex app-server daemon restart`. Then:

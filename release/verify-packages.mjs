@@ -9,7 +9,7 @@ const packages = [
   ["relay-linux-x64-gnu", "linux", "x64", "glibc"],
 ];
 
-if (main.name !== "@gkorepanov/ccodex") throw new Error(`Unexpected main package name: ${main.name}`);
+if (main.name !== "@pasaranax/ccodex") throw new Error(`Unexpected main package name: ${main.name}`);
 if (!existsSync(join(root, "package-lock.json"))) throw new Error("Development package-lock.json is missing");
 if (existsSync(join(root, "npm-shrinkwrap.json"))) throw new Error("npm-shrinkwrap.json must not be published");
 if (main.files.includes("npm-shrinkwrap.json") || main.files.includes("package-lock.json")) {
@@ -37,4 +37,4 @@ if (targetIndex >= 0) {
   accessSync(binary, constants.X_OK);
 }
 
-console.log(`Verified @gkorepanov/ccodex ${main.version}${targetIndex >= 0 ? ` and ${process.argv[targetIndex + 1]}` : " package matrix"}.`);
+console.log(`Verified @pasaranax/ccodex ${main.version}${targetIndex >= 0 ? ` and ${process.argv[targetIndex + 1]}` : " package matrix"}.`);

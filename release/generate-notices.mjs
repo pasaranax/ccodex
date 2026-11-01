@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8"));
 const npmRows = Object.entries(lock.packages).filter(([path]) =>
-  path.startsWith("node_modules/") && !path.startsWith("node_modules/@gkorepanov/ccodex")).map(([path, entry]) => {
+  path.startsWith("node_modules/") && !path.startsWith("node_modules/@pasaranax/ccodex")).map(([path, entry]) => {
   const name = path.slice("node_modules/".length);
   let license = entry.license;
   if (!license && existsSync(join(root, path, "package.json"))) {

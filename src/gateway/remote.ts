@@ -13,9 +13,9 @@ const START_TIMEOUT_MS = 10_000;
 const require = createRequire(import.meta.url);
 
 const RELAY_PACKAGES: Readonly<Record<string, string>> = {
-  "darwin-arm64": "@gkorepanov/ccodex-relay-darwin-arm64",
-  "linux-arm64-gnu": "@gkorepanov/ccodex-relay-linux-arm64-gnu",
-  "linux-x64-gnu": "@gkorepanov/ccodex-relay-linux-x64-gnu",
+  "darwin-arm64": "@pasaranax/ccodex-relay-darwin-arm64",
+  "linux-arm64-gnu": "@pasaranax/ccodex-relay-linux-arm64-gnu",
+  "linux-x64-gnu": "@pasaranax/ccodex-relay-linux-x64-gnu",
 };
 
 export function relayBinary(): string {
@@ -30,7 +30,7 @@ export function relayBinary(): string {
   }
   const local = join(dirname(fileURLToPath(import.meta.url)), "..", "bin", "ccodex-relay");
   if (existsSync(local)) return local;
-  throw new Error(`CCodex relay package for '${runtimePlatformKey()}' is missing. Reinstall @gkorepanov/ccodex with optional dependencies.`);
+  throw new Error(`CCodex relay package for '${runtimePlatformKey()}' is missing. Reinstall @pasaranax/ccodex with optional dependencies.`);
 }
 
 interface Relay {

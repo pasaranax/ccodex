@@ -6,10 +6,10 @@ if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(version)) {
   throw new Error("Usage: npm run release:promote -- <semver> [--execute]");
 }
 const packages = [
-  "@gkorepanov/ccodex-relay-darwin-arm64",
-  "@gkorepanov/ccodex-relay-linux-arm64-gnu",
-  "@gkorepanov/ccodex-relay-linux-x64-gnu",
-  "@gkorepanov/ccodex",
+  "@pasaranax/ccodex-relay-darwin-arm64",
+  "@pasaranax/ccodex-relay-linux-arm64-gnu",
+  "@pasaranax/ccodex-relay-linux-x64-gnu",
+  "@pasaranax/ccodex",
 ];
 for (const name of packages) {
   const spec = `${name}@${version}`;

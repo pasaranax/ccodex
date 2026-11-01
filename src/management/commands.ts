@@ -16,7 +16,7 @@ import { compareSemver } from "./shimSelect.js";
 import { setupNode } from "./node.js";
 
 const execute = promisify(execFile);
-const PACKAGE = "@gkorepanov/ccodex";
+const PACKAGE = "@pasaranax/ccodex";
 const BEGIN = "# >>> ccodex >>>";
 const END = "# <<< ccodex <<<";
 

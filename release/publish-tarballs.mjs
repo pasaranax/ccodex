@@ -1,8 +1,10 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
-const [tag, ...tarballs] = process.argv.slice(2);
-if (!tag || tarballs.length === 0) throw new Error("Usage: publish-tarballs.mjs <dist-tag> <tarball...>");
+const args = process.argv.slice(2);
+const noProvenance = args.includes("--no-provenance");
+const [tag, ...tarballs] = args.filter((arg) => arg !== "--no-provenance");
+if (!tag || tarballs.length === 0) throw new Error("Usage: publish-tarballs.mjs <dist-tag> [--no-provenance] <tarball...>");
 
 for (const tarball of tarballs) {
   const archive = resolve(tarball);
@@ -14,5 +16,5 @@ for (const tarball of tarballs) {
     continue;
   }
   if (!`${view.stdout}\n${view.stderr}`.includes("E404")) throw new Error(`Could not check ${spec}: ${view.stderr}`);
-  execFileSync("npm", ["publish", archive, "--access", "public", "--tag", tag], { stdio: "inherit" });
+  execFileSync("npm", ["publish", archive, "--access", "public", "--tag", tag, ...(noProvenance ? ["--provenance=false"] : [])], { stdio: "inherit" });
 }

@@ -118,7 +118,7 @@ export function displacedCodexPath(home = productHome()): string {
 export function isCcodex(path: string, home = productHome()): boolean {
   const real = realpathSync(path);
   const own = process.argv[1] && existsSync(process.argv[1]) ? realpathSync(process.argv[1]) : undefined;
-  return inside(path, join(home, "bin")) || inside(path, join(home, "versions")) || real === own || real.includes("/@gkorepanov/ccodex/");
+  return inside(path, join(home, "bin")) || inside(path, join(home, "versions")) || real === own || /\/@(?:gkorepanov|pasaranax)\/ccodex\//u.test(real);
 }
 
 /** Every `codex` on PATH that is not CCodex, in PATH order; at `remoteCodexPath()` the codex CCodex displaced there. */
