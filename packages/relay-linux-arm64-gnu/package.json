@@ -1,6 +1,6 @@
 {
   "name": "@pasaranax/ccodex-relay-linux-arm64-gnu",
-  "version": "0.5.20-pasaranax.1",
+  "version": "0.5.20-pasaranax.2",
   "description": "CCodex remote-control relay for Linux arm64 glibc.",
   "repository": {
     "type": "git",

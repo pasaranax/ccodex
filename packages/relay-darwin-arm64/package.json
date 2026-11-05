@@ -1,6 +1,6 @@
 {
   "name": "@pasaranax/ccodex-relay-darwin-arm64",
-  "version": "0.5.20-pasaranax.1",
+  "version": "0.5.20-pasaranax.2",
   "description": "CCodex remote-control relay for macOS arm64.",
   "repository": {
     "type": "git",
