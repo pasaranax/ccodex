@@ -1,6 +1,6 @@
 {
   "name": "@pasaranax/ccodex",
-  "version": "0.5.20-pasaranax.2",
+  "version": "0.5.20-pasaranax.3",
   "description": "Personal CCodex fork with native MCP, model discovery, macOS Node, and daemon recovery fixes.",
   "homepage": "https://github.com/pasaranax/ccodex#readme",
   "repository": {
@@ -66,9 +66,9 @@
     "ws": "8.21.0"
   },
   "optionalDependencies": {
-    "@pasaranax/ccodex-relay-darwin-arm64": "0.5.20-pasaranax.2",
-    "@pasaranax/ccodex-relay-linux-arm64-gnu": "0.5.20-pasaranax.2",
-    "@pasaranax/ccodex-relay-linux-x64-gnu": "0.5.20-pasaranax.2"
+    "@pasaranax/ccodex-relay-darwin-arm64": "0.5.20-pasaranax.3",
+    "@pasaranax/ccodex-relay-linux-arm64-gnu": "0.5.20-pasaranax.3",
+    "@pasaranax/ccodex-relay-linux-x64-gnu": "0.5.20-pasaranax.3"
   },
   "devDependencies": {
     "@openai/codex": "0.156.0",
