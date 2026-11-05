@@ -47,11 +47,14 @@ describe("daemon supervisor", () => {
 
     const release = await publishDaemonChildRecord();
     // Stock verifies the record by the Linux native identity it checks first: the boot and the start ticks.
-    const startTicks = Number(processStartTime(process.pid)!.slice("linux:".length));
+    const identity = process.platform === "linux" ? { processIdentity: {
+      bootId: readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim(),
+      startTicks: Number(processStartTime(process.pid)!.slice("linux:".length)),
+    } } : {};
     expect(JSON.parse(readFileSync(pidFile, "utf8"))).toEqual({
       pid: process.pid,
       processStartTime: processStartTime(process.pid),
-      processIdentity: { bootId: readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim(), startTicks },
+      ...identity,
     });
     release();
     expect(existsSync(pidFile)).toBe(false);

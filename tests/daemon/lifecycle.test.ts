@@ -186,6 +186,11 @@ describe("npm-backed hybrid daemon lifecycle", () => {
     expect(wire(await run(a)).status).toBe("alreadyRunning");
     expect(wire(await run()).status).toBe("alreadyRunning");
     expect(wire(await run(b)).status).toBe("alreadyRunning");
+    // An installed update must wait for the live Desktop owner to exit, even when another launcher uses the new path.
+    const running = JSON.parse(readFileSync(pidFile, "utf8"));
+    writeFileSync(pidFile, JSON.stringify({ ...running, wrapperPath: "/previous-version/ccodex/main.js" }), { mode: 0o600 });
+    expect(wire(await run(b)).status).toBe("alreadyRunning");
+    expect(alive(desktop.pid as number)).toBe(true);
     // Once it closes (its pipe file may stay), the next launch replaces it.
     await new Promise<void>((resolve) => appA.close(() => resolve()));
     writeFileSync(a, "");

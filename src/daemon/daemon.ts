@@ -251,8 +251,10 @@ class HybridDaemon {
     const info = await probeMaybe(this.paths.socketPath);
     const managed = reconcileManagedProcess(this.paths.pidFile);
     const managedOwnsSocket = managed ? this.ownsSocket(managed) : false;
-    const current = managed?.wrapperPath === this.paths.wrapperPath
-      && (!this.desktop || managed.desktop === this.desktop || (!!managed.desktop && await listening(managed.desktop)));
+    const liveDesktop = !!managed?.desktop && await listening(managed.desktop);
+    // An installed update takes effect after the owning Desktop exits or an explicit restart, not on a background launch.
+    const current = (managed?.wrapperPath === this.paths.wrapperPath || liveDesktop)
+      && (!this.desktop || managed?.desktop === this.desktop || liveDesktop);
     if (info && managed && managedOwnsSocket && current) {
       return this.lifecycleOutput("alreadyRunning", "pid", undefined, info.appServerVersion);
     }
