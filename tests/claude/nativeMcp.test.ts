@@ -15,7 +15,7 @@ const context = (): NativeMcpContext => ({
   approvalPolicy: "on-request", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, plan: false,
 });
 const definition = { name: "read.profile", description: "Read a profile", inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" } } }, annotations: { readOnlyHint: true }, _meta: { origin: "native" } };
-function fixture(onRequest?: (method: string, params: any, signal?: AbortSignal) => Promise<unknown>, worktree = false) {
+function fixture(onRequest?: (method: string, params: any, signal?: AbortSignal) => Promise<unknown>, worktree = false, server = "github") {
   let current = context();
   const requests: { method: string; params: any }[] = [];
   let callback: (method: string, params: any) => Promise<unknown>;
@@ -32,7 +32,7 @@ function fixture(onRequest?: (method: string, params: any, signal?: AbortSignal)
         if (method === "thread/start") return { thread: { id } };
         if (method === "mcpServerStatus/list") return params.cursor
           ? { data: [{ name: worktree ? "codex_app" : "app", pluginId: "disabled@personal", tools: { [worktree ? "create_worktree" : "write"]: { ...definition, name: "write", annotations: { readOnlyHint: false } } } }], nextCursor: null }
-          : { data: [{ name: "github", tools: { read: definition, ui: { ...definition, _meta: { ui: { visibility: ["app"] } } } } }], nextCursor: "page-2" };
+          : { data: [{ name: server, tools: { read: definition, ui: { ...definition, _meta: { ui: { visibility: ["app"] } } } } }], nextCursor: "page-2" };
         if (method === "mcpServer/tool/call") return action ? action() : { content: [{ type: "text", text: "native result" }], structuredContent: null, isError: false };
         return {};
       },
@@ -43,6 +43,25 @@ function fixture(onRequest?: (method: string, params: any, signal?: AbortSignal)
 }
 
 describe("native MCP bridge", () => {
+  it.each(["node_repl", "cua_repl"])("binds %s execution to the helper while preserving the browser's owning session", async (server) => {
+    const f = fixture(undefined, false, server);
+    try {
+      for (const helper of ["helper-1", "helper-2"]) {
+        await f.bridge.call({ name: nativeToolName(server, "read"), _meta: {
+          "openai/threadId": "other", "x-codex-turn-metadata": { thread_id: "other", session_id: "other" },
+        } });
+        const call = f.requests.filter(r => r.method === "mcpServer/tool/call").at(-1)!.params;
+        // node_repl checks this against the canonical threadId injected by stock.
+        expect(call._meta["x-codex-turn-metadata"].thread_id).toBe(call.threadId);
+        expect(call.threadId).toBe(helper);
+        expect(call._meta["x-codex-turn-metadata"]).toMatchObject({ session_id: "claude-owner", turn_id: "turn-1", model: "claude:sonnet" });
+        expect(call._meta["openai/threadId"]).toBe("claude-owner");
+        expect(call._meta["openai/turnId"]).toBe("turn-1");
+        f.bridge.refresh();
+      }
+    } finally { f.bridge.close(); }
+  });
+
   it("settles the worktree result before applying its directory change and rotating the helper", async () => {
     const f = fixture(undefined, true);
     f.setAction(async () => {

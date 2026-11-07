@@ -221,10 +221,12 @@ export class NativeMcpBridge {
         this.callContext = context;
         this.callAbort = new AbortController();
         this.workspaceCall = selected.server === "codex_app" && ["create_worktree", "attach_worktree", "restore_worktree"].includes(selected.tool);
+        // REPL validates thread_id against stock's helper; browser access and tabs belong to session_id.
+        const executionThread = selected.server === "node_repl" || selected.server === "cua_repl" ? this.nativeThread : context.threadId;
         const result = await connection.request("mcpServer/tool/call", {
           threadId: this.nativeThread, server: selected.server, tool: selected.tool, arguments: params.arguments ?? {},
           _meta: { ...params._meta, "openai/threadId": context.threadId, "openai/turnId": context.turnId, "x-codex-turn-metadata": {
-            thread_id: context.threadId, session_id: context.threadId, turn_id: context.turnId, model: context.model,
+            thread_id: executionThread, session_id: context.threadId, turn_id: context.turnId, model: context.model,
           } },
         });
         this.assertOwner(context);
