@@ -2,6 +2,24 @@
 
 Back to the [README](../README.md).
 
+## Personal fork and upstream
+
+This fork incorporates upstream through 0.5.22. Model discovery and launch-time
+selection of the App's Node use upstream's implementations; the former fork
+implementations have been removed. Setup reads the old `fallbackNode` field once
+when migrating an App-Node installation, so management commands keep using the
+external Node after the App is removed.
+
+The remaining fork-specific behavior includes native MCP and worktree attachment,
+REPL helper-thread metadata with browser ownership kept on the original session,
+and inter-chat message cards with structured tool-output content. Daemon recovery
+keeps owner-fenced locks (including replacement-owner and slow-recovery cases),
+and update discovery preserves a running Desktop gateway. These protections are
+not covered by upstream's stale-marker timeout alone.
+
+Package names and release versions remain independent of upstream. Integrating
+upstream source does not publish a new npm version.
+
 ## Features in detail
 
 - **Claude models in the model picker**, next to `gpt-*` (ids `claude:…`), with Claude's
@@ -65,11 +83,9 @@ mcp-server`, removed from Codex in `0.154`, is served by CCodex on top of `codex
   `~/.ccodex/backups/remote-codex` and stays the Codex CCodex runs.
 - macOS: sets `CODEX_CLI_PATH` for the local App (`launchctl setenv` plus a login
   LaunchAgent `dev.ccodex.codex-cli-path`), so the App starts CCodex instead of its bundled
-  `codex`. The shims prefer a supported Node from `/Applications/ChatGPT.app` or
-  `~/Applications/ChatGPT.app`; without one they keep setup's Node. With one, setup's
-  Node stays their fallback if the app loses its own, and its directory stays on their
-  PATH for `npm` and what `npm i -g` put there. The signed `.app` is never touched, so
-  its auto-updates keep working.
+  `codex`. The signed `.app` is never touched, so its auto-updates keep working. That `codex`
+  runs on the App's own Node (`Contents/Resources/cua_node`): the App gives its tools (chats'
+  `codex_app` tools, Browser Use) only to processes signed as it is.
 - Claude Code: sets `cleanupPeriodDays: 36500` in `~/.claude/settings.json` when unset
   (Claude deletes transcripts older than 30 days by default, and with them your Claude
   chats), and installs the `codex-wrapper` agent and the `codex` MCP server (user scope).

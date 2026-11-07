@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -13,7 +13,6 @@ import { installCliPathAgent, uninstallCliPathAgent, type CliPathAgentInstall } 
 import { relayBinary } from "../gateway/remote.js";
 import { atomicSymlink, atomicWrite } from "./files.js";
 import { compareSemver } from "./shimSelect.js";
-import { setupNode } from "./node.js";
 
 const execute = promisify(execFile);
 const PACKAGE = "@pasaranax/ccodex";
@@ -32,7 +31,7 @@ interface Manifest {
   readonly remoteCodexShim?: { path: string; target: string; backupPath?: string };
   readonly desktopCliPath?: CliPathAgentInstall;
   readonly nodeExecutable: string;
-  /** The Node outside the app when `nodeExecutable` is Desktop's: a setup run by a shim can't learn it from its own process. */
+  /** Read only when migrating shims from the fork's former App-Node selection. */
   readonly fallbackNode?: string;
   readonly installedAt: string;
 }
@@ -57,10 +56,18 @@ function readManifest(): Manifest | undefined {
 const sha256 = (content: string | Buffer) => createHash("sha256").update(content).digest("hex");
 const quote = (value: string) => `'${value.replaceAll("'", "'\"'\"'")}'`;
 
-function shim(name: "codex" | "ccodex", node: string, fallback?: string): string {
-  // Desktop's Node can go with an app update and has no `npm i -g` binaries beside it: the Node outside the app has both.
-  const fallbackNode = fallback ? `if [ ! -x "$CCODEX_NODE" ]; then\n  CCODEX_NODE=${quote(fallback)}\nfi\n` : "";
-  const fallbackPath = fallback ? `PATH=\${PATH:-}:${quote(dirname(fallback))}\nexport PATH\n` : "";
+export function shim(name: "codex" | "ccodex", node: string, platform = process.platform): string {
+  // On macOS the App's tools pipe (chats' codex_app tools, Browser Use) trusts only processes signed as the App is: the
+  // codex it starts runs on the App's own Node, setup's staying on PATH (codex and tools npm installed beside it).
+  const appNode = name === "codex" && platform === "darwin" ? `for app in /Applications/ChatGPT.app "$HOME/Applications/ChatGPT.app"; do
+  if [ -x "$app/Contents/Resources/cua_node/bin/node" ]; then
+    CCODEX_NODE="$app/Contents/Resources/cua_node/bin/node"
+    PATH="\${PATH:-}:"${quote(dirname(node))}
+    export PATH
+    break
+  fi
+done
+` : "";
   const prelude = `#!/bin/sh
 set -eu
 if [ "\${CCODEX_SHIM_ACTIVE:-}" = 1 ]; then
@@ -70,7 +77,7 @@ fi
 CCODEX_SHIM_ACTIVE=1
 CCODEX_HOME=\${CCODEX_HOME:-"$HOME/.ccodex"}
 CCODEX_NODE=${quote(node)}
-${fallbackNode}if [ ! -x "$CCODEX_NODE" ]; then
+${appNode}if [ ! -x "$CCODEX_NODE" ]; then
   CCODEX_NODE=$(command -v node 2>/dev/null || true)
 fi
 if [ -z "$CCODEX_NODE" ] || [ ! -x "$CCODEX_NODE" ]; then
@@ -78,7 +85,7 @@ if [ -z "$CCODEX_NODE" ] || [ ! -x "$CCODEX_NODE" ]; then
   exit 69
 fi
 export CCODEX_SHIM_ACTIVE CCODEX_HOME
-${fallbackPath}`;
+`;
   const current = `exec "$CCODEX_NODE" "$CCODEX_HOME/current/node_modules/${PACKAGE}/dist/cli/main.js" "$@"\n`;
   if (name === "codex") return `${prelude}${current}`;
   // Management commands prefer a newer globally installed package (npm i -g → ccodex setup).
@@ -212,12 +219,17 @@ export async function setup(args: readonly string[]): Promise<number> {
     if (code !== 0) throw new Error(`Migrating CCodex 0.4 threads failed (exit ${code}); nothing was activated.`);
   }
   const previous = readManifest();
-  const nodeExecutable = await setupNode();
-  const fallbackNode = [process.execPath, previous?.fallbackNode].find((node) => node && node !== nodeExecutable);
+  let nodeExecutable = process.execPath;
+  if (previous?.nodeExecutable === process.execPath && previous.fallbackNode) {
+    try {
+      accessSync(previous.fallbackNode, constants.X_OK);
+      nodeExecutable = previous.fallbackNode;
+    } catch { /* A removed legacy runtime cannot replace the running Node. */ }
+  }
   atomicSymlink(join("versions", version), paths.current);
   const shimHashes: Record<string, string> = {};
   for (const name of ["codex", "ccodex"] as const) {
-    const content = shim(name, nodeExecutable, fallbackNode);
+    const content = shim(name, nodeExecutable);
     atomicWrite(join(paths.bin, name), content, 0o755);
     shimHashes[name] = sha256(content);
   }
@@ -238,7 +250,6 @@ export async function setup(args: readonly string[]): Promise<number> {
     ...(remoteCodexShim ? { remoteCodexShim } : {}),
     ...(desktopCliPath ? { desktopCliPath } : {}),
     nodeExecutable,
-    ...(fallbackNode ? { fallbackNode } : {}),
     installedAt: new Date().toISOString(),
   };
   atomicWrite(paths.manifest, `${JSON.stringify(manifest, null, 2)}\n`, 0o600);

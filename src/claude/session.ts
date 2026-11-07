@@ -15,7 +15,7 @@ import {
 } from "./codexRollout.js";
 import { claudeContent, inputText, normalizeUserInput, promptItem, turnInput, userMessage } from "./inputMapper.js";
 import { completedToolItem } from "./native/projector.js";
-import { ANSWER_CHARS, assistantBlockItemId, continuationTurnId } from "./native/ids.js";
+import { ANSWER_CHARS, assistantBlockItemId, compactionItem, continuationTurnId } from "./native/ids.js";
 import { isNarration, messageText, readTranscriptRecords, type UserRecord } from "./native/records.js";
 import { userText } from "./native/summary.js";
 import { claudeEffort, DELEGATION_OFF, DELEGATION_ON, ULTRA } from "./delegation.js";
@@ -487,7 +487,8 @@ export class ClaudeSession {
 
   public async steer(params: JsonObject): Promise<string> {
     if (!this.turn) throw invalidRequest("no active turn to steer");
-    if (this.turn.waiting) return (await this.startTurn({ input: params.input, clientUserMessageId: params.clientUserMessageId })).id;
+    // Waiting for sub-agents the chat is done, as stock's is: Desktop then drops the copy it showed and sends a new turn.
+    if (this.turn.waiting) throw invalidRequest("no active turn to steer");
     if (this.turn.retry?.limit) throw invalidRequest("Cannot steer while waiting for the usage limit to reset; queue the message instead");
     const input = normalizeUserInput(params.input ?? []);
     // The client's id is the message's in the transcript: history gives it back as the message's client id.
@@ -965,17 +966,16 @@ export class ClaudeSession {
         if (m.state === "idle") this.maybeComplete();
         return;
       // Like stock, a compaction shows from its start (a long chat's takes minutes); one that fails stays unfinished.
-      // Its id live is the start's: history names it after the boundary.
       case "status":
         if (m.status === "compacting" && this.turn && !this.turn.compaction) {
-          this.turn.compaction = { type: "contextCompaction", id: m.uuid };
+          this.turn.compaction = compactionItem(this.turn.id, this.turn.items);
           this.itemStarted(this.turn.compaction);
         }
         if (m.compact_result === "failed" && this.turn) this.turn.compaction = undefined;
         return;
       case "compact_boundary": {
         this.ensureTurn();
-        const item = this.turn!.compaction ?? { type: "contextCompaction", id: m.uuid };
+        const item = this.turn!.compaction ?? compactionItem(this.turn!.id, this.turn!.items);
         if (!this.turn!.compaction) this.itemStarted(item);
         this.turn!.compaction = undefined;
         this.itemCompleted(item);

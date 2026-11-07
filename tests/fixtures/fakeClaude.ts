@@ -33,6 +33,7 @@ export const fakeClaude: FakeClaudeLog & { reset(): void; reply: (text: string) 
   backgroundMs: 500,
   /** Set: the models probe answers only once it settles. */
   modelsHold: null,
+  /** Set: Claude tells a model's context window only once it settles. */
   contextHold: null,
   /** Set: Claude lists this model but refuses to switch to it (the account or organization may not use it). */
   refusedModel: null,
@@ -683,10 +684,7 @@ export function fakeQuery({ prompt, options }: { prompt: AsyncIterable<Message>;
       return record("backgroundTasks")(toolUseId).then(() => backgrounded);
     },
     // Like Claude with CLAUDE_CODE_AUTO_COMPACT_WINDOW=400000: Haiku's own window is smaller.
-    getContextUsage: () => {
-      fakeClaude.calls.push({ method: "getContextUsage", args: [] });
-      return (fakeClaude.contextHold ?? Promise.resolve()).then(() => ({ maxTokens: String(options.model).includes("haiku") ? 200_000 : 400_000 }));
-    },
+    getContextUsage: () => (fakeClaude.contextHold ?? Promise.resolve()).then(() => ({ maxTokens: String(options.model).includes("haiku") ? 200_000 : 400_000 })),
     setModel: (model: string) => {
       if (model === fakeClaude.refusedModel) return Promise.reject(new Error(`Model '${model}' is restricted by your organization's settings.`));
       options.model = model;

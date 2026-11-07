@@ -1444,6 +1444,9 @@ describe("gateway (black box: fake stock + fake Claude)", () => {
     const started = compactions("item/started");
     expect(started).toHaveLength(1);
     expect(compactions("item/completed")).toEqual(started);
+    // History names it as live did: Desktop would show it twice otherwise.
+    const { thread } = await client.request("thread/read", { threadId, includeTurns: true });
+    expect(thread.turns.flatMap((turn: any) => turn.items).filter((item: any) => item.type === "contextCompaction").map((item: any) => item.id)).toEqual(started);
     await client.turn(threadId, "second");
     fakeClaude.compactError = "Error during compaction: summarization produced empty response";
     await client.turn(threadId, "/compact");
@@ -1513,6 +1516,19 @@ describe("gateway (black box: fake stock + fake Claude)", () => {
     const models = await client.request("model/list", {});
     expect(models.data.map((model: any) => model.id)).toContain(CLAUDE);
     expect(models.data.map((model: any) => model.id)).not.toContain("claude:stale-model");
+  });
+
+  it("lists Claude's models before Claude tells their context windows (a request each)", async () => {
+    await gateway.stop();
+    let release!: () => void;
+    fakeClaude.contextHold = new Promise((resolve) => { release = resolve; });
+    gateway = await startTestGateway({ dataDir: mkdtempSync(join(tmpdir(), "ccodex-state-")) });
+    client = await gateway.connect();
+    const models = await client.request("model/list", {});
+    expect(models.data.map((model: any) => model.id)).toContain(CLAUDE);
+    expect(existsSync(join(gateway.config.dataDir, "claude-models.json"))).toBe(false);
+    release();
+    await vi.waitFor(() => expect(existsSync(join(gateway.config.dataDir, "claude-models.json"))).toBe(true));
   });
 
   it("clears the run directories of gateways killed without stopping", async () => {
