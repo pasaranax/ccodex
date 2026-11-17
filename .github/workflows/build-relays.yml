@@ -20,7 +20,22 @@ permissions:
   contents: read
 
 jobs:
+  darwin-source:
+    runs-on: ubuntu-22.04
+    outputs:
+      reuse: ${{ steps.source.outputs.reuse }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: source
+        # Reuse the verified binary while its source and toolchain match v0.5.20-pasaranax.3.
+        run: |
+          if git diff --quiet 2c2135277e43d91b7a53542c227dc1aa9f8cee74 HEAD -- relay rust-toolchain.toml scripts/build-relay.sh; then
+            echo 'reuse=true' >> "$GITHUB_OUTPUT"
+          fi
   relay:
+    needs: darwin-source
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +43,7 @@ jobs:
           - { runner: macos-26, target: aarch64-apple-darwin, package: relay-darwin-arm64 }
           - { runner: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, package: relay-linux-arm64-gnu }
           - { runner: ubuntu-22.04, target: x86_64-unknown-linux-gnu, package: relay-linux-x64-gnu }
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.package == 'relay-darwin-arm64' && needs.darwin-source.outputs.reuse == 'true' && 'ubuntu-22.04' || matrix.runner }}
     env:
       CARGO_INCREMENTAL: "0"
     steps:
@@ -38,14 +53,27 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Restore published macOS relay for identical build inputs
+        if: matrix.package == 'relay-darwin-arm64' && needs.darwin-source.outputs.reuse == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          archive=pasaranax-ccodex-relay-darwin-arm64-0.5.20-pasaranax.3.tgz
+          gh release download v0.5.20-pasaranax.3 --repo pasaranax/ccodex --pattern "$archive" --dir "$RUNNER_TEMP"
+          printf '%s  %s\n' 3159d551fc333e2b5b3d00312cfe3b6394709d0a7b788cf8ceaded1103c4cd1c "$RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p packages/relay-darwin-arm64/bin
+          tar -xzf "$RUNNER_TEMP/$archive" -C packages/relay-darwin-arm64 --strip-components=1 package/bin/ccodex-relay
+          file packages/relay-darwin-arm64/bin/ccodex-relay | grep -E 'Mach-O.*arm64'
       # The binary carries no package version: while the relay's sources are unchanged, a release reuses it.
       - uses: actions/cache@v4
+        if: matrix.package != 'relay-darwin-arm64' || needs.darwin-source.outputs.reuse != 'true'
         id: bin
         with:
           path: packages/${{ matrix.package }}/bin/ccodex-relay
-          key: relay-bin-${{ matrix.target }}-${{ hashFiles('relay/Cargo.toml', 'relay/Cargo.lock', 'relay/src/**', 'relay/vendor/**', 'release/Dockerfile.relay', 'scripts/build-relay.sh', 'scripts/build-linux-relay.sh') }}
+          key: relay-bin-${{ matrix.target }}-${{ hashFiles('relay/Cargo.toml', 'relay/Cargo.lock', 'relay/src/**', 'relay/vendor/**', 'release/Dockerfile.relay', 'scripts/build-relay.sh', 'scripts/build-linux-relay.sh') }}${{ matrix.package == 'relay-darwin-arm64' && hashFiles('rust-toolchain.toml') || '' }}
       - uses: docker/setup-buildx-action@v3
-        if: runner.os == 'Linux' && steps.bin.outputs.cache-hit != 'true'
+        if: matrix.package != 'relay-darwin-arm64' && steps.bin.outputs.cache-hit != 'true'
       - uses: actions/cache@v4
         if: runner.os == 'macOS' && steps.bin.outputs.cache-hit != 'true'
         with:
@@ -62,10 +90,11 @@ jobs:
           CCODEX_RELAY_TARGET: ${{ matrix.target }}
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: ./scripts/build-relay.sh
-      - if: runner.os == 'Linux' && steps.bin.outputs.cache-hit != 'true'
+      - if: matrix.package != 'relay-darwin-arm64' && steps.bin.outputs.cache-hit != 'true'
         run: ./scripts/build-linux-relay.sh "${{ matrix.target }}" "${{ matrix.package }}"
       - run: node release/verify-packages.mjs --target "${{ matrix.package }}"
       - run: packages/${{ matrix.package }}/bin/ccodex-relay --help
+        if: matrix.package != 'relay-darwin-arm64' || runner.os == 'macOS'
       - run: mkdir -p artifacts && npm pack ./packages/${{ matrix.package }} --pack-destination artifacts
       - uses: actions/upload-artifact@v4
         with:
