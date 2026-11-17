@@ -18,6 +18,7 @@ export type DaemonCommand =
 export type Invocation =
   | { readonly kind: "delegate" }
   | { readonly kind: "mcpServer" }
+  | { readonly kind: "reviewMcpServer" }
   | { readonly kind: "daemon"; readonly command: DaemonCommand; readonly remoteControl: boolean; readonly ignored: string[] }
   | { readonly kind: "proxy"; readonly socketPath: string; readonly proxyArgs: string[] }
   | {
@@ -99,6 +100,7 @@ function socketPathFromListen(listen: string | undefined, config: Config): strin
 
 export function classifyInvocation(args: readonly string[], config: Config): Invocation {
   if (args[0] === "mcp-server") return { kind: "mcpServer" };
+  if (args[0] === "claude-review-mcp") return { kind: "reviewMcpServer" };
   const appServerIndex = args.indexOf("app-server");
   if (appServerIndex < 0) return { kind: "delegate" };
 
@@ -145,4 +147,18 @@ export function classifyInvocation(args: readonly string[], config: Config): Inv
 
 export function withProxySocket(args: readonly string[], socketPath: string): string[] {
   return [...args, "--sock", socketPath];
+}
+
+/** Register the reviewer only in the stock app-server started by CCodex. */
+export function reviewMcpOverrides(config: Config, node: string, args: readonly string[]): string[] {
+  const prefix = "mcp_servers.ccodex_review";
+  const codex = JSON.stringify(config.codex);
+  const claude = JSON.stringify(config.claudeBinary);
+  return [
+    "-c", `${prefix}.command=${JSON.stringify(node)}`,
+    "-c", `${prefix}.args=${JSON.stringify([...args, "claude-review-mcp"])}`,
+    "-c", `${prefix}.env={ CCODEX_CODEX = ${codex}, CCODEX_CLAUDE_BINARY = ${claude} }`,
+    "-c", `${prefix}.env_vars=["CCODEX_HOME","CCODEX_CONFIG","CLAUDE_CONFIG_DIR","CLAUDE_CODE_OAUTH_TOKEN","ANTHROPIC_API_KEY","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_BASE_URL"]`,
+    "-c", `${prefix}.tool_timeout_sec=600`,
+  ];
 }

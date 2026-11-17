@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { delimiter, dirname } from "node:path";
-import { classifyInvocation, withProxySocket } from "./args.js";
+import { classifyInvocation, reviewMcpOverrides, withProxySocket } from "./args.js";
 import { delegate } from "./delegate.js";
 import { loadConfig, stockCodex } from "../config.js";
 import { Logger } from "../log.js";
@@ -8,7 +8,7 @@ import { APP_LAUNCH, publishDaemonChildRecord, withGatewayStartupFence } from ".
 import { publishGatewayOwner } from "../daemon/ownership.js";
 import { runDaemonCommand } from "../daemon/daemon.js";
 import { loadDaemonSettings } from "../daemon/settings.js";
-import { runManagementCommand } from "../management/commands.js";
+import { packageVersion, runManagementCommand } from "../management/commands.js";
 
 async function main(): Promise<number> {
   // Desktop may start us with a minimal PATH: keep `npm i -g` binaries (codex, `env node` shebangs) reachable.
@@ -25,8 +25,11 @@ async function main(): Promise<number> {
   if (invocation.kind === "delegate") return delegate(config.delegateCodex, args);
   if (invocation.kind === "mcpServer") {
     const { runMcpServer } = await import("../mcp/server.js");
-    const { packageVersion } = await import("../management/commands.js");
     return runMcpServer(config, packageVersion());
+  }
+  if (invocation.kind === "reviewMcpServer") {
+    const { runReviewMcpServer } = await import("../mcp/claudeReview.js");
+    return runReviewMcpServer(config, packageVersion());
   }
   if (invocation.kind === "daemon") {
     const output = await runDaemonCommand(config, invocation, process.argv[1]!);
@@ -61,7 +64,9 @@ async function main(): Promise<number> {
     gateway = await withGatewayStartupFence(async () => {
       // The PID handshake identifies the detached child; the daemon separately waits for socket ownership.
       releaseDaemonRecord = await publishDaemonChildRecord();
-      return startGateway({ ...config, codex: await stockCodex(config, app) }, invocation.socketPath, stockArgs, logger, remoteControl);
+      const stockConfig = { ...config, codex: await stockCodex(config, app) };
+      const reviewMcp = reviewMcpOverrides(stockConfig, process.execPath, [...process.execArgv, process.argv[1]!]);
+      return startGateway(stockConfig, invocation.socketPath, [...reviewMcp, ...stockArgs], logger, remoteControl);
     });
     releaseGatewayOwner = publishGatewayOwner(invocation.socketPath);
     await stopped;

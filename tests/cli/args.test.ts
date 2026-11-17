@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { classifyInvocation, withProxySocket } from "../../src/cli/args.js";
+import { parse } from "smol-toml";
+import { classifyInvocation, reviewMcpOverrides, withProxySocket } from "../../src/cli/args.js";
 import { testConfig } from "../fixtures/config.js";
 
 const config = testConfig();
@@ -7,6 +8,21 @@ const config = testConfig();
 describe("classifyInvocation", () => {
   it("delegates normal Codex commands", () => {
     expect(classifyInvocation(["exec", "pwd"], config)).toEqual({ kind: "delegate" });
+  });
+
+  it("configures the reviewer using the running CCodex and its configured Claude", () => {
+    const args = reviewMcpOverrides(config, "/path with spaces/node", ["/path with spaces/main.js"]);
+    expect(parse(args.filter((_, index) => index % 2 === 1).join("\n"))).toMatchObject({
+      mcp_servers: {
+        ccodex_review: {
+          command: "/path with spaces/node",
+          args: ["/path with spaces/main.js", "claude-review-mcp"],
+          env: { CCODEX_CODEX: config.codex, CCODEX_CLAUDE_BINARY: config.claudeBinary },
+          tool_timeout_sec: 600,
+        },
+      },
+    });
+    expect(classifyInvocation(["claude-review-mcp"], config)).toEqual({ kind: "reviewMcpServer" });
   });
 
   it("recognizes the desktop remote app-server launch shape", () => {

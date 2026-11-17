@@ -17,8 +17,9 @@ keeps owner-fenced locks (including replacement-owner and slow-recovery cases),
 and update discovery preserves a running Desktop gateway. These protections are
 not covered by upstream's stale-marker timeout alone.
 
-Package names and release versions remain independent of upstream. Integrating
-upstream source does not publish a new npm version.
+The fork uses its own package names. Update the package version's numeric base
+when merging a new upstream release, and use the `-pasaranax.N` suffix for fork
+releases on that base.
 
 ## Features in detail
 
@@ -46,6 +47,11 @@ upstream source does not publish a new npm version.
   Claude process has a chat open, the App can't start a turn in it.
 - **Claude can delegate to Codex** through the `codex-wrapper` agent that setup installs;
   what Codex does streams into the Claude chat.
+- **GPT can request an independent Claude review** through `mcp__ccodex_review__review_commit`.
+  Pass the Git worktree's absolute `cwd` and a commit SHA. The tool defaults to Opus at
+  high effort and accepts an explicit `model` and optional review `instructions`.
+  Claude can read tracked files from that commit. The review is returned to the caller
+  without saving a Claude session. The tool is available after restarting the CCodex gateway.
 - **`/cc` status card** (also `/ccstatus`, `/ccodex`, `/ccstate`, with or without the
   slash, or *CCodex status* in the `/` menu): the chat's model, effort, permission mode,
   context use, session state, and Claude and Codex plan limits. Sent while a turn runs,
@@ -199,14 +205,15 @@ Validate each new trusted publisher by publishing a new version through the
 workflow within two days. Skipping an already-published version does not validate
 OIDC. Use the subsequent-release steps below for that next version.
 
-For each subsequent release, merge the upstream changes and local fixes, run the
-checks, and choose a new version such as `0.5.20-pasaranax.2`:
+When merging a new upstream release, update the package manifests and lockfile
+as part of the merge. Start with `-pasaranax.1` for the new upstream base and
+increment the suffix for subsequent fork releases on that base.
 
 ```sh
-npm run release:version -- 0.5.20-pasaranax.2
+npm run release:version -- 0.5.22-pasaranax.1
 ```
 
-After committing the version change, an annotated `vVERSION` tag pushed to the
+After running the checks and committing the version change, an annotated `vVERSION` tag pushed to the
 fork builds and publishes all four packages and creates the GitHub Release with
 the installer, tarballs, checksums, and dependency metadata. The workflow refreshes
 the lockfile after the new platform packages reach npm. Promote a tested `next`
