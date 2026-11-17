@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeClaude, fakeQuery, fakeStartup } from "../fixtures/fakeClaude.js";
 import { startTestGateway, type Client, type TestGateway } from "./harness.js";
@@ -212,6 +212,74 @@ describe("gateway (black box: fake stock + fake Claude)", () => {
     const transcript = join(projects, readdirSync(projects).find((key) => existsSync(join(projects, key, `${threadId}.jsonl`)))!, `${threadId}.jsonl`);
     expect(readFileSync(transcript, "utf8")).toContain("claude: hello");
     expect(readFileSync(transcript, "utf8")).not.toContain("\"type\":\"api-request\"");
+  });
+
+  it("permanently deletes only the Claude thread Desktop deletes: its attached-threads lists hold no Claude thread", async () => {
+    const [target, ...others] = [await claudeThread(), await claudeThread(), await claudeThread()];
+    for (const threadId of [target, ...others]) await client.turn(threadId!, "hello");
+    // Desktop's "Permanently delete": every thread attached to it, walked, each deleted, then the thread itself.
+    const attached = async (threadId: string): Promise<string[]> => {
+      const ids: string[] = [];
+      for (const archived of [false, true]) {
+        let cursor: string | null = null;
+        do {
+          const page: any = await client.request("thread/list", { attachedToThreadId: threadId, archived, cursor, limit: 100, useStateDbOnly: true });
+          ids.push(...page.data.map((row: any) => row.id));
+          cursor = page.nextCursor;
+        } while (cursor);
+      }
+      return ids;
+    };
+    const doomed = [target!];
+    for (let i = 0; i < doomed.length; i++) doomed.push(...(await attached(doomed[i]!)).filter((id) => !doomed.includes(id)));
+    expect(doomed).toEqual([target]);
+    for (const threadId of doomed) await client.request("thread/delete", { threadId });
+    const left = (await client.request("thread/list", { limit: 200 })).data.map((row: any) => row.id);
+    expect(left).not.toContain(target);
+    expect(left).toEqual(expect.arrayContaining(others));
+    // A filter not known here lists no Claude thread either; excluded ones are left out, as stock leaves them.
+    expect((await client.request("thread/list", { limit: 200, someFutureFilter: "x" })).data.map((row: any) => row.id)).toEqual(expect.not.arrayContaining(others));
+    expect((await client.request("thread/list", { limit: 200, excludedThreadIds: [others[0]] })).data.map((row: any) => row.id)).toEqual(expect.not.arrayContaining([others[0]]));
+  });
+
+  it("never deletes a chat for good: a deleted, emptied by an edit or reverted-away chat goes to the trash, sections with it", async () => {
+    const trash = join(gateway.config.dataDir, "trash");
+    const trashed = () => (existsSync(trash) ? readdirSync(trash) : []).map((name) => ({ name, ...JSON.parse(readFileSync(join(trash, name, "meta.json"), "utf8")) }));
+    const transcript = (threadId: string) => {
+      const projects = join(process.env.CLAUDE_CONFIG_DIR!, "projects");
+      return readFileSync(join(projects, readdirSync(projects).find((key) => existsSync(join(projects, key, `${threadId}.jsonl`)))!, `${threadId}.jsonl`), "utf8");
+    };
+    // Deleted, with its sub-agents' folder and its section.
+    const deleted = await claudeThread();
+    await client.turn(deleted, "ask a codex sub-agent: KIWI");
+    await client.request("thread/section/move", { threadId: deleted, sectionId: "section-pinned", beforeThreadId: null });
+    const identity = { attachmentType: "worktree", identityKey: "/work/deleted" };
+    const { attachment } = await client.request("thread/attachment/add", { threadId: deleted, ...identity, payload: null });
+    const before = transcript(deleted);
+    await client.request("thread/delete", { threadId: deleted });
+    const entry = trashed().find((item) => item.threadId === deleted)!;
+    expect(readFileSync(join(trash, entry.name, `${deleted}.jsonl`), "utf8")).toBe(before);
+    expect(existsSync(join(trash, entry.name, deleted, "subagents"))).toBe(true);
+    expect(entry.meta.section).toMatchObject({ sectionId: "section-pinned" });
+    expect(entry.meta.threadAttachments).toEqual([attachment]);
+    expect((await client.request("thread/attachmentOwner/list", identity)).data).toEqual([]);
+    // The first message edited: the old transcript is kept, the chat starts over.
+    const edited = await claudeThread();
+    const { turn } = await client.turn(edited, "apple");
+    const old = transcript(edited);
+    await client.request("thread/revert", { threadId: edited, beforeTurnId: turn.id });
+    expect(readFileSync(join(trash, trashed().find((item) => item.threadId === edited)!.name, `${edited}.jsonl`), "utf8")).toBe(old);
+    // A switch reverted away: the GPT backend's rollout is kept before stock deletes it.
+    const switchedThread = await claudeThread();
+    await client.turn(switchedThread, "first");
+    const { turn: switched } = await client.turn(switchedThread, "second", { model: "gpt-6-luna" });
+    const beforeRevert = JSON.parse(readFileSync(join(gateway.config.dataDir, "meta.json"), "utf8")).lineages[switchedThread];
+    const backend: string = beforeRevert.at(-1).threadId;
+    await client.request("thread/revert", { threadId: switchedThread, beforeTurnId: switched.id });
+    const gpt = trashed().find((item) => item.threadId === backend)!;
+    expect(gpt.copied).toHaveLength(1);
+    expect(existsSync(join(trash, gpt.name, basename(gpt.copied[0])))).toBe(true);
+    expect(gpt.meta.lineages[switchedThread]).toEqual(beforeRevert);
   });
 
   it("keeps a deleted Claude thread gone when Claude writes its closing metadata into the file afterwards", async () => {
@@ -567,6 +635,18 @@ describe("gateway (black box: fake stock + fake Claude)", () => {
     await client.turn(threadId, "one", { serviceTier: "fast" });
     await vi.waitFor(() => expect(client.notifications("thread/settings/updated", threadId).at(-1)!.params.threadSettings).toMatchObject({ serviceTier: null }));
     expect(await client.request("thread/resume", { threadId })).toMatchObject({ serviceTier: null });
+  });
+
+  it("keeps Fast picked for Fable 5.2, which Claude takes only as picked in the running session: on a chat's start and on a switch to it", async () => {
+    const { thread } = await client.request("thread/start", { model: "claude:fable", cwd: "/work", serviceTier: "fast" });
+    await client.turn(thread.id, "one");
+    const switched = await claudeThread();
+    await client.turn(switched, "one", { serviceTier: "fast" });
+    await client.turn(switched, "two", { model: "claude:fable" });
+    for (const threadId of [thread.id, switched]) {
+      expect(client.notifications("thread/settings/updated", threadId).map((message) => message.params.threadSettings.serviceTier)).not.toContain(null);
+      expect(await client.request("thread/resume", { threadId })).toMatchObject({ serviceTier: "fast" });
+    }
   });
 
   it("runs a Claude chat with no effort chosen at the effort the picker shows for its model, not Claude's own default", async () => {
@@ -1808,31 +1888,34 @@ describe("gateway (black box: fake stock + fake Claude)", () => {
 describe("lineages Claude cleaned up", () => {
   afterEach(async () => { await gateway.stop(); });
 
-  it("list a lineage whose own segment's transcript is gone under its oldest segment kept, pinned as before", async () => {
+  it("keeps a lineage whose segment's transcript is gone as it is: the chat is back whole once the transcript is", async () => {
     fakeClaude.reset();
     const expired = "0c0c0c0c-0000-4000-8000-000000000001";
     const session = "0c0c0c0c-0000-4000-8000-000000000002";
     const directory = join(process.env.CLAUDE_CONFIG_DIR!, "projects", "-work");
+    const record = (sessionId: string, uuid: string, content: string, timestamp: string) => `${JSON.stringify({
+      type: "user", uuid, parentUuid: null, sessionId, cwd: "/work", timestamp, origin: { kind: "human" }, message: { role: "user", content },
+    })}\n`;
     mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, `${session}.jsonl`), `${JSON.stringify({
-      type: "user", uuid: "n1", parentUuid: null, sessionId: session, cwd: "/work", timestamp: "2026-09-20T00:00:00.000Z",
-      origin: { kind: "human" }, message: { role: "user", content: "after the switch" },
-    })}\n`);
-    gateway = await startTestGateway({}, {
-      lineages: { [expired]: [
-        { provider: "claude", threadId: expired, lastTurnId: "gone" },
-        { provider: "claude", threadId: session, lastTurnId: null },
-      ] },
+    writeFileSync(join(directory, `${session}.jsonl`), record(session, "n1", "after the switch", "2026-09-20T00:00:00.000Z"));
+    const meta = {
+      lineages: { [expired]: [{ provider: "claude", threadId: expired, lastTurnId: "o1" }, { provider: "claude", threadId: session, lastTurnId: null }] },
       sections: { [expired]: { sectionId: "section-pinned", enteredAt: 1 } },
-    });
+      threadAttachments: { [expired]: [{ id: "saved", attachmentType: "worktree", identityKey: "/work/restored", payload: null, createdAt: 1 }] },
+    };
+    gateway = await startTestGateway({}, meta);
     client = await gateway.connect();
-    const ids = (await client.request("thread/list", { limit: 200 })).data.map((row: any) => row.id);
-    expect(ids).toContain(session);
-    expect(ids).not.toContain(expired);
+    const ids = async () => (await client.request("thread/list", { limit: 200 })).data.map((row: any) => row.id);
+    expect(await ids()).not.toContain(expired);
+    expect(JSON.parse(readFileSync(join(gateway.config.dataDir, "meta.json"), "utf8"))).toMatchObject(meta);
+    writeFileSync(join(directory, `${expired}.jsonl`), record(expired, "o1", "before the switch", "2026-09-19T00:00:00.000Z"));
+    await vi.waitFor(async () => expect(await ids()).toContain(expired));
+    const { data: attachments } = await client.request("thread/attachment/list", { threadId: expired });
+    expect(attachments).toEqual(meta.threadAttachments[expired]);
     const pinned = await client.request("thread/list", { limit: 50, sectionId: "section-pinned", sortKey: "section_position" });
-    expect(pinned.data.map((row: any) => row.id)).toEqual([session]);
-    const { thread } = await client.request("thread/read", { threadId: session, includeTurns: true });
-    expect(itemsOf(thread.turns)).toEqual(["user:after the switch"]);
+    expect(pinned.data.map((row: any) => row.id)).toEqual([expired]);
+    const { thread } = await client.request("thread/read", { threadId: expired, includeTurns: true });
+    expect(itemsOf(thread.turns)).toEqual(["user:before the switch", "contextCompaction", "user:after the switch"]);
   });
 });
 

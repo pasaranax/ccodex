@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { NativeMcpAccess } from "./claude/nativeAccess.js";
+import type { JsonObject } from "./protocol/codex.js";
 
 export type Provider = "codex" | "claude";
 
@@ -107,26 +108,6 @@ export class Meta {
     this.save();
   }
 
-  /**
-   * Drops finished segments whose backend is gone: Claude deletes transcripts after `cleanupPeriodDays`. A lineage
-   * whose own segment went is listed under its oldest segment kept from then on.
-   */
-  public prune(exists: (segment: Segment) => boolean): void {
-    let changed = false;
-    for (const [publicId, segments] of Object.entries(this.data.lineages)) {
-      const kept = segments.filter((segment, index) => index === segments.length - 1 || exists(segment));
-      if (kept.length === segments.length) continue;
-      changed = true;
-      delete this.data.lineages[publicId];
-      const id = kept.some((segment) => segment.threadId === publicId) ? publicId : kept[0]!.threadId;
-      if (id !== publicId) this.rename(publicId, id);
-      if (kept.length > 1 || kept[0]!.threadId !== id) this.data.lineages[id] = kept;
-    }
-    if (!changed) return;
-    this.reindex();
-    this.save();
-  }
-
   public isArchived(threadId: string): boolean { return this.data.archived.includes(threadId); }
 
   public setArchived(threadId: string, archived: boolean): void {
@@ -187,6 +168,16 @@ export class Meta {
     this.save();
   }
 
+  /** What meta.json holds of a thread, kept with its trashed transcript. */
+  public entries(threadId: string): JsonObject {
+    return {
+      archived: this.isArchived(threadId), section: this.data.sections[threadId] ?? null, plan: this.data.plans![threadId] ?? null,
+      pausedGoal: this.data.pausedGoals![threadId] ?? null,
+      nativeMcpAccess: this.nativeMcpAccess(threadId) ?? null, threadAttachments: this.threadAttachments[threadId] ?? [],
+      lineages: Object.fromEntries(Object.entries(this.data.lineages).filter(([id, segments]) => id === threadId || segments.some((segment) => segment.threadId === threadId))),
+    };
+  }
+
   public forget(threadId: string): void {
     this.data.archived = this.data.archived.filter((id) => id !== threadId);
     delete this.data.sections[threadId];
@@ -205,20 +196,6 @@ export class Meta {
     if (JSON.stringify(this.data.nativeMcpAccess![threadId] ?? {}) === JSON.stringify(access)) return;
     this.data.nativeMcpAccess![threadId] = structuredClone(access);
     this.save();
-  }
-
-  /** Archive flag, section and order of a thread listed under another id from now on. */
-  private rename(from: string, to: string): void {
-    if (from in this.data.threadAttachments!) {
-      this.data.threadAttachments![to] = this.data.threadAttachments![from]!;
-      delete this.data.threadAttachments![from];
-    }
-    this.data.archived = this.data.archived.map((id) => id === from ? to : id);
-    if (from in this.data.sections) {
-      this.data.sections[to] = this.data.sections[from]!;
-      delete this.data.sections[from];
-    }
-    for (const order of Object.values(this.data.sectionOrder)) order.forEach((id, index) => { if (id === from) order[index] = to; });
   }
 
   private reindex(): void {

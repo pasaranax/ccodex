@@ -1131,15 +1131,15 @@ Generated from package-lock.json and locked Cargo metadata. Review entries and u
 | cargo:zvariant | 4.2.0 | MIT |
 | cargo:zvariant_derive | 4.2.0 | MIT |
 | cargo:zvariant_utils | 2.1.0 | MIT |
-| npm:@anthropic-ai/claude-agent-sdk | 0.3.304 | SEE LICENSE IN README.md |
-| npm:@anthropic-ai/claude-agent-sdk-darwin-arm64 | 0.3.304 | SEE LICENSE IN LICENSE.md |
-| npm:@anthropic-ai/claude-agent-sdk-darwin-x64 | 0.3.304 | SEE LICENSE IN LICENSE.md |
-| npm:@anthropic-ai/claude-agent-sdk-linux-arm64 | 0.3.304 | SEE LICENSE IN LICENSE.md |
-| npm:@anthropic-ai/claude-agent-sdk-linux-arm64-musl | 0.3.304 | SEE LICENSE IN LICENSE.md |
-| npm:@anthropic-ai/claude-agent-sdk-linux-x64 | 0.3.304 | SEE LICENSE IN LICENSE.md |
-| npm:@anthropic-ai/claude-agent-sdk-linux-x64-musl | 0.3.304 | SEE LICENSE IN LICENSE.md |
-| npm:@anthropic-ai/claude-agent-sdk-win32-arm64 | 0.3.304 | SEE LICENSE IN LICENSE.md |
-| npm:@anthropic-ai/claude-agent-sdk-win32-x64 | 0.3.304 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk | 0.3.321 | SEE LICENSE IN README.md |
+| npm:@anthropic-ai/claude-agent-sdk-darwin-arm64 | 0.3.321 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk-darwin-x64 | 0.3.321 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk-linux-arm64 | 0.3.321 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk-linux-arm64-musl | 0.3.321 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk-linux-x64 | 0.3.321 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk-linux-x64-musl | 0.3.321 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk-win32-arm64 | 0.3.321 | SEE LICENSE IN LICENSE.md |
+| npm:@anthropic-ai/claude-agent-sdk-win32-x64 | 0.3.321 | SEE LICENSE IN LICENSE.md |
 | npm:@anthropic-ai/sdk | 0.111.0 | MIT |
 | npm:@babel/runtime | 7.29.7 | MIT |
 | npm:@esbuild/aix-ppc64 | 0.25.12 | MIT |
@@ -1168,7 +1168,7 @@ Generated from package-lock.json and locked Cargo metadata. Review entries and u
 | npm:@esbuild/win32-arm64 | 0.25.12 | MIT |
 | npm:@esbuild/win32-ia32 | 0.25.12 | MIT |
 | npm:@esbuild/win32-x64 | 0.25.12 | MIT |
-| npm:@hono/node-server | 1.19.17 | MIT |
+| npm:@hono/node-server | 2.1.9 | MIT |
 | npm:@jridgewell/sourcemap-codec | 1.6.0 | MIT |
 | npm:@modelcontextprotocol/sdk | 1.32.1 | MIT |
 | npm:@openai/codex | 0.156.0 | Apache-2.0 |
@@ -1212,8 +1212,8 @@ Generated from package-lock.json and locked Cargo metadata. Review entries and u
 | npm:ajv | 8.20.0 | MIT |
 | npm:ajv-formats | 3.0.1 | MIT |
 | npm:assertion-error | 2.0.1 | MIT |
-| npm:body-parser | 2.3.0 | MIT |
-| npm:body-parser/node_modules/content-type | 2.0.0 | MIT |
+| npm:body-parser | 2.4.0 | MIT |
+| npm:body-parser/node_modules/content-type | 2.1.0 | MIT |
 | npm:bytes | 3.1.2 | MIT |
 | npm:call-bind-apply-helpers | 1.0.2 | MIT |
 | npm:call-bound | 1.0.4 | MIT |
@@ -1246,7 +1246,7 @@ Generated from package-lock.json and locked Cargo metadata. Review entries and u
 | npm:express-rate-limit | 8.5.2 | MIT |
 | npm:fast-deep-equal | 3.1.3 | MIT |
 | npm:fast-sha256 | 1.3.0 | Unlicense |
-| npm:fast-uri | 3.1.8 | BSD-3-Clause |
+| npm:fast-uri | 3.1.9 | BSD-3-Clause |
 | npm:fdir | 6.5.0 | MIT |
 | npm:finalhandler | 2.1.1 | MIT |
 | npm:forwarded | 0.2.0 | MIT |
@@ -1259,11 +1259,11 @@ Generated from package-lock.json and locked Cargo metadata. Review entries and u
 | npm:gopd | 1.2.0 | MIT |
 | npm:has-symbols | 1.1.0 | MIT |
 | npm:hasown | 2.0.4 | MIT |
-| npm:hono | 4.13.9 | MIT |
+| npm:hono | 4.13.19 | MIT |
 | npm:http-errors | 2.0.1 | MIT |
 | npm:iconv-lite | 0.7.3 | MIT |
 | npm:inherits | 2.0.4 | ISC |
-| npm:ip-address | 10.7.2 | MIT |
+| npm:ip-address | 10.7.6 | MIT |
 | npm:ipaddr.js | 1.9.1 | MIT |
 | npm:is-promise | 4.0.0 | MIT |
 | npm:isexe | 2.0.0 | ISC |
@@ -1306,7 +1306,7 @@ Generated from package-lock.json and locked Cargo metadata. Review entries and u
 | npm:pkce-challenge | 5.0.1 | MIT |
 | npm:postcss | 8.5.28 | MIT |
 | npm:proxy-addr | 2.0.8 | MIT |
-| npm:qs | 6.16.0 | BSD-3-Clause |
+| npm:qs | 6.17.1 | BSD-3-Clause |
 | npm:range-parser | 1.3.0 | MIT |
 | npm:raw-body | 3.0.2 | MIT |
 | npm:require-from-string | 2.0.2 | MIT |
@@ -1378,5 +1378,5 @@ Generated from package-lock.json and locked Cargo metadata. Review entries and u
 | npm:why-is-node-running | 2.3.0 | MIT |
 | npm:wrappy | 1.0.2 | ISC |
 | npm:ws | 8.21.0 | MIT |
-| npm:zod | 4.4.3 | MIT |
+| npm:zod | 4.6.7 | MIT |
 | npm:zod-to-json-schema | 3.25.2 | ISC |

@@ -7,6 +7,7 @@ import { invalidRequest, requestedModel, type JsonObject, type Thread, type Turn
 import { historyCursors, occurrencesPage, paginateItems, paginateTurns, startedTurn, turnCursor, turnView } from "../protocol/turnPagination.js";
 import type { Connection } from "./connection.js";
 import type { Gateway } from "./server.js";
+import { toTrash } from "../trash.js";
 
 /** Codex's own `templates/compact/prompt.md` and `summary_prefix.md`. */
 export const COMPACT_PROMPT = `You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff summary for another LLM that will resume the task.
@@ -507,6 +508,7 @@ export class Lineages {
     }
     if (!dropSegment) await this.forward(connection, segments[at.segment]!, "thread/revert", { threadId: publicId, beforeTurnId });
     const kept = segments.slice(0, keep).map((segment, index) => index === keep - 1 ? { ...segment, lastTurnId: null } : segment);
+    const trashEntries = new Map(dropped.map(({ threadId }) => [threadId, this.gateway.meta.entries(threadId)]));
     // A lineage back to its own single thread is dropped, unless forks still list that thread as a segment.
     const shared = Object.entries(this.gateway.meta.lineages).some(([id, other]) => id !== publicId && other.some((segment) => segment.threadId === publicId));
     if (kept.length === 1 && kept[0]!.threadId === publicId && !shared) this.gateway.meta.deleteLineage(publicId);
@@ -516,8 +518,15 @@ export class Lineages {
     // stock's news of them would read as the public thread's for every client.
     for (const segment of dropped) {
       if (Object.values(this.gateway.meta.lineages).some((other) => other.some((entry) => entry.threadId === segment.threadId))) continue;
-      if (segment.provider === "claude") await this.gateway.claude.discard(segment.threadId);
-      else await this.gateway.stock.request("thread/delete", { threadId: segment.threadId }).catch(() => undefined);
+      const entries = trashEntries.get(segment.threadId)!;
+      if (segment.provider === "claude") await this.gateway.claude.discard(segment.threadId, entries);
+      else {
+        // Deleted only once its rollout is copied into the trash: CCodex never deletes a chat for good.
+        const path: string | undefined = await this.gateway.stock.request("thread/read", { threadId: segment.threadId }).then(({ thread }) => thread.path, () => undefined);
+        if (!path || !existsSync(path)) continue;
+        toTrash(this.gateway.config.dataDir, segment.threadId, { copied: [path] }, entries);
+        await this.gateway.stock.request("thread/delete", { threadId: segment.threadId }).catch(() => undefined);
+      }
     }
     const turns = await this.stitchedTurns(kept);
     const row = await this.thread(rowSegment);

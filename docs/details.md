@@ -4,7 +4,7 @@ Back to the [README](../README.md).
 
 ## Personal fork and upstream
 
-This fork incorporates upstream through 0.5.22. Model discovery and launch-time
+This fork incorporates upstream through 0.5.24. Model discovery and launch-time
 selection of the App's Node use upstream's implementations; the former fork
 implementations have been removed. Setup reads the old `fallbackNode` field once
 when migrating an App-Node installation, so management commands keep using the
@@ -77,7 +77,10 @@ CCodex's `codex`, one stock app-server serves every GPT chat unchanged, and `cla
 chats run on the Claude Agent SDK with Claude's transcripts in `~/.claude/projects` as
 their only source of truth. The only state CCodex adds is an optional
 `~/.ccodex/state/meta.json` (provider-switch history, archive flags and sections of Claude
-chats). Plain `codex …` commands (TUI, `exec`, `login`) run your installed Codex; `codex
+chats). CCodex never deletes a chat for good: a deleted Claude chat, one emptied by an edit of
+its first message, and a provider switch a revert undoes go to `~/.ccodex/state/trash/` with
+their meta.json entries, until you empty it by hand; meta.json keeps a switched chat whose
+transcript is gone (the chat is hidden until it is back). Plain `codex …` commands (TUI, `exec`, `login`) run your installed Codex; `codex
 mcp-server`, removed from Codex in `0.154`, is served by CCodex on top of `codex exec`.
 
 ## What setup changes
@@ -133,6 +136,10 @@ Claude's 30-day cleanup deleted come back as text. The 0.4 databases move to
 - `native_mcp` (default `false`) — Claude chats also get the MCP tools and connectors set up in Codex, as a
   `codex_native` MCP server beside Claude's own. Tools run in stock Codex, with no GPT turn, under the chat's own
   access, plugin settings and approvals.
+- `claude_idle_compaction_hold_hours` (default `24`) — how long a quiet Claude chat of 200K+ tokens keeps its Claude
+  process (other chats: 30 min). About an hour quiet, Claude summarizes such a chat (idle compaction) and keeps the
+  summary in the process for the next message, so the chat doesn't send its whole history again once the prompt cache
+  is gone. At most 10 Claude processes run; the one quiet longest closes first.
 - `rpc_limit_mb` (default `10`) — the most CCodex sends the App in one message or as one command's output (how the
   App shows a remote host's image or video): a bigger answer fails, a bigger notification is dropped, the output stops
   there. One huge message holds up every chat over SSH and can drop the phone's connection. `0` turns it off.
@@ -210,7 +217,7 @@ as part of the merge. Start with `-pasaranax.1` for the new upstream base and
 increment the suffix for subsequent fork releases on that base.
 
 ```sh
-npm run release:version -- 0.5.22-pasaranax.1
+npm run release:version -- 0.5.24-pasaranax.1
 ```
 
 After running the checks and committing the version change, an annotated `vVERSION` tag pushed to the

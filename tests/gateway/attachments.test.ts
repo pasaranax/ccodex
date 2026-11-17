@@ -101,24 +101,6 @@ describe("native attachments on Claude chats", () => {
     expect(await client.request("thread/attachmentOwner/list", identity)).toEqual({ data: [], nextCursor: null });
   });
 
-  it("keeps migrated Meta attachments after an expired Claude row becomes a GPT row", async () => {
-    const client = await gateway.connect();
-    const { thread } = await client.request("thread/start", { model: "gpt-6-luna", cwd: gateway.root });
-    const core = new Gateway(gateway.config, gateway.config.publicSocket, new Logger("error"));
-    core.claude = { owns: () => false } as unknown as Gateway["claude"];
-    const connection = { upstream: { request: (method: string, params: unknown) => client.request(method, params) } } as unknown as Connection;
-    const attachments = new Attachments(core);
-    const meta = core.meta;
-    meta.setThreadAttachments("expired", [{ id: "saved", ...identity, payload: null, createdAt: 1 }]);
-    meta.setLineage("expired", [{ provider: "claude", threadId: "expired", lastTurnId: "old" }, { provider: "codex", threadId: thread.id, lastTurnId: null }]);
-    meta.prune(segment => segment.threadId !== "expired");
-    await client.request("thread/archive", { threadId: thread.id });
-    expect(await attachments.handle(connection, "thread/attachmentOwner/list", { ...identity, archived: true })).toEqual({ data: [{ threadId: thread.id, archived: true }], nextCursor: null });
-    expect(await attachments.handle(connection, "thread/attachment/list", { threadId: thread.id })).toMatchObject({ data: [{ ...identity, payload: null }] });
-    await attachments.handle(connection, "thread/attachment/remove", { threadId: thread.id, ...identity });
-    expect(await attachments.handle(connection, "thread/attachmentOwner/list", identity)).toEqual({ data: [], nextCursor: null });
-  });
-
   it("preserves concurrent Claude registrations while native discovery is pending", async () => {
     const core = new Gateway(gateway.config, gateway.config.publicSocket, new Logger("error"));
     core.claude = { owns: () => true } as unknown as Gateway["claude"];

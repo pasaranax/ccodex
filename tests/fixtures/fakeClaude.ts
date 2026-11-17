@@ -183,8 +183,10 @@ async function* answer(prompt: Message, options: Message, transcript: Transcript
     // Like the CLI's after each API answer: no `utilization`, the plan windows in `unifiedWindows`.
     yield base(sessionId, { type: "rate_limit_event", rate_limit_info: { status: "allowed", resetsAt: 1790539800, rateLimitType: "five_hour", isUsingOverage: false,
       unifiedWindows: { five_hour: { utilization: 0.1, resetsAt: 1790539800 }, seven_day: { utilization: 0.06, resetsAt: 1791082800 } } } });
-    // Like the CLI on an account without usage credits: fast asked for, answered at standard speed.
-    const fast = options.settings?.fastMode ? { fast_mode_state: fakeClaude.fastOff ? "off" : "on", ...(fakeClaude.fastOff ? { fast_mode_disabled_reason: "extra_usage_disabled" } : {}) } : {};
+    // Like the CLI on an account without usage credits: fast asked for, answered at standard speed. On Fable 5.2 Fast
+    // counts only as picked in the running session (applyFlagSettings), not as the process started with it.
+    const picked = !["fable", "claude-fable-5-2"].includes(String(options.model)) || options.fastPicked;
+    const fast = options.settings?.fastMode ? { fast_mode_state: fakeClaude.fastOff || !picked ? "off" : "on", ...(fakeClaude.fastOff ? { fast_mode_disabled_reason: "extra_usage_disabled" } : {}) } : {};
     yield base(sessionId, { type: "result", subtype, is_error: false, result, total_cost_usd: 0.01, user_message_uuids: [uuid], modelUsage: { "claude-opus-5-5": { contextWindow: 200_000 } }, ...fast });
     yield base(sessionId, { type: "command_lifecycle", state: "completed", command_uuid: uuid });
     if (!agentsRunning) yield base(sessionId, { type: "system", subtype: "session_state_changed", state: "idle" });
@@ -576,7 +578,7 @@ async function* answer(prompt: Message, options: Message, transcript: Transcript
   yield base(sessionId, { type: "stream_event", event: { type: "content_block_start", index: textIndex, content_block: { type: "text", text: "" } } });
   yield base(sessionId, { type: "stream_event", event: { type: "content_block_delta", index: textIndex, delta: { type: "text_delta", text: reply } } });
   yield base(sessionId, { type: "stream_event", event: { type: "message_stop" } });
-  const assistant = { type: "assistant", message: { id: messageId, role: "assistant", model, content: [{ type: "text", text: reply }], stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 3 } } };
+  const assistant = { type: "assistant", message: { id: messageId, role: "assistant", model, content: [{ type: "text", text: reply }], stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 3, ...(text.startsWith("big chat") ? { cache_read_input_tokens: 250_000 } : {}) } } };
   // Like the CLI: the record names the effort the model ran at (unset: its own default; Haiku has none).
   const effort = options.effort ?? (model.includes("haiku") ? undefined : "medium");
   transcript.write({ ...assistant, apiBlockIndex: textIndex, ...(effort ? { effort } : {}) });
@@ -698,6 +700,7 @@ export function fakeQuery({ prompt, options }: { prompt: AsyncIterable<Message>;
     setPermissionMode: (mode: string) => { options.permissionMode = settle(mode); return record("setPermissionMode")(mode); },
     applyFlagSettings: (settings: Message) => {
       if ("effortLevel" in settings) options.effort = settings.effortLevel ?? undefined;
+      if (settings.fastMode === true && (options.settings?.fastMode !== true || "model" in settings)) options.fastPicked = true;
       if ("fastMode" in settings) options.settings = { ...options.settings, fastMode: settings.fastMode };
       return record("applyFlagSettings")(settings);
     },

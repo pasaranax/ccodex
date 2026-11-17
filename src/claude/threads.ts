@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { deleteSession, forkSession, renameSession, type ModelInfo, type PermissionMode } from "@anthropic-ai/claude-agent-sdk";
+import { forkSession, renameSession, type ModelInfo, type PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { v7 as uuidv7 } from "uuid";
 import type { Config } from "../config.js";
 import type { Connection } from "../gateway/connection.js";
@@ -26,6 +26,7 @@ import { ClaudeSession, type SessionSettings } from "./session.js";
 import { nativeAccessFrom } from "./nativeAccess.js";
 import { stockVisualizeSkill, writeVisualizePlugin } from "./visualize.js";
 import type { Meta } from "../meta.js";
+import { toTrash } from "../trash.js";
 
 interface SideThread {
   readonly id: string;
@@ -52,6 +53,12 @@ const WINDOW_MINUTES: Record<string, number> = { five_hour: 300, seven_day: 10_0
  * unless a command it runs still works (e2e shortens the wait).
  */
 const IDLE_MS = Number(process.env.CCODEX_E2E_IDLE_MS) || 30 * 60_000;
+/**
+ * A chat of 200K+ tokens keeps its quiet process longer (`claude_idle_compaction_hold_hours`), as Claude Code's terminal
+ * keeps one: about an hour quiet, Claude summarizes such a chat (idle compaction) and uses the summary, held in the
+ * process, at the next prompt.
+ */
+const IDLE_COMPACT_TOKENS = 200_000;
 /** How long an earlier chat stays open before its process is started ahead of a prompt (tests shorten it). */
 const RESUME_WARM_MS = Number(process.env.CCODEX_E2E_RESUME_WARM_MS) || 10_000;
 /** Claude processes kept at most (each holds its session in memory: 250–550 MB); tests lower it. */
@@ -109,7 +116,6 @@ export class ClaudeThreads {
       void this.probeModels().then((models) => { this.models_ = Promise.resolve(models); }, () => undefined);
     } else void this.models().catch(() => undefined);
     await this.catalog.refresh();
-    this.gateway.meta.prune((segment) => segment.provider === "codex" || this.catalog.get(segment.threadId) !== undefined);
     const known = new Map(this.catalog.sessions().map((summary) => [summary.sessionId, summary.customTitle ?? summary.aiTitle]));
     // Sessions and titles changed outside CCodex (the claude CLI, /rename) show up without a reload.
     const announce = () => {
@@ -169,21 +175,22 @@ export class ClaudeThreads {
     }));
     const own = (session: ClaudeSession) => processes?.filter((process) => process.session === session.threadId).map((process) => process.pid);
     const computing = (pids: number[] | undefined) => pids?.some((pid) => now - this.cpuSeen.get(pid)!.at < IDLE_MS) ?? false;
-    const idle = IDLE_MS < 60_000 ? `${IDLE_MS / 1000} s` : `${Math.round(IDLE_MS / 60_000)} min`;
+    const spell = (ms: number) => ms < 60_000 ? `${ms / 1000} s` : `${Math.round(ms / 60_000)} min`;
     for (const session of sessions) {
       const pids = own(session);
       if (computing(pids)) continue;
+      const hold = session.lastUsage.inputTokens >= IDLE_COMPACT_TOKENS ? this.config.claudeIdleCompactionHoldMs : IDLE_MS;
       if (session.waitingOnTasks && pids?.length) {
-        this.act(session, "claude.tasks.hung", `stopped its background tasks: their commands used no CPU for ${idle}`, pids);
+        this.act(session, "claude.tasks.hung", `stopped its background tasks: their commands used no CPU for ${spell(IDLE_MS)}`, pids);
         void session.stopTasks().catch(() => killProcesses(pids));
-      } else if (session.quiet(now, IDLE_MS) && !this.gateway.subscribers(session.threadId).size) {
-        this.act(session, "claude.unloaded", `unloaded the chat: nobody had it open and it was quiet for ${idle}`, pids);
+      } else if (session.quiet(now, hold) && !this.gateway.subscribers(session.threadId).size) {
+        this.act(session, "claude.unloaded", `unloaded the chat: nobody had it open and it was quiet for ${spell(hold)}`, pids);
         this.sessions.delete(session.threadId);
         void session.unload().then(() => killProcesses(pids ?? []));
         this.gateway.emit(session.threadId, "thread/status/changed", { threadId: session.threadId, status: { type: "notLoaded" } });
         this.gateway.emit(session.threadId, "thread/closed", { threadId: session.threadId });
-      } else if (session.loaded && session.quiet(now, IDLE_MS)) {
-        this.closeProcess(session, pids, `closed its Claude process: quiet for ${idle}; the next prompt starts it again`);
+      } else if (session.loaded && session.quiet(now, hold)) {
+        this.closeProcess(session, pids, `closed its Claude process: quiet for ${spell(hold)}; the next prompt starts it again`);
       }
     }
     const running = sessions.filter((session) => session.loaded);
@@ -1269,15 +1276,22 @@ export class ClaudeThreads {
     killProcesses(pids);
   }
 
-  /** Removes a session with its transcript (also what a failed switch to Claude leaves behind). */
-  public async discard(threadId: string): Promise<void> {
+  /** Removes a session, its transcript into the trash (also what a failed switch to Claude leaves behind). */
+  public async discard(threadId: string, entries?: JsonObject): Promise<void> {
     await this.sessions.get(threadId)?.unload();
     this.sessions.delete(threadId);
     await this.catalog.refresh();
-    if (this.catalog.get(threadId)) await deleteSession(threadId);
+    this.trash(threadId, entries);
     this.catalog.dropPages(threadId);
     this.gateway.meta.forget(threadId);
     await this.catalog.refresh();
+  }
+
+  /** A transcript and its sub-agents' folder (what Claude's deleteSession removes) into the trash, never deleted. */
+  private trash(threadId: string, entries = this.gateway.meta.entries(threadId)): void {
+    const summary = this.catalog.get(threadId);
+    if (!summary) return;
+    toTrash(this.config.dataDir, threadId, { moved: [summary.path, summary.path.replace(/\.jsonl$/u, "")] }, entries);
   }
 
   private async delete(threadId: string): Promise<JsonObject> {
@@ -1334,7 +1348,7 @@ export class ClaudeThreads {
     // Everything rolled back: Claude neither resumes nor starts anew a transcript without messages, so the session
     // starts over under its id with its settings, and its name comes back with its first turn.
     const name = this.catalog.get(threadId)!.customTitle;
-    await deleteSession(threadId);
+    this.trash(threadId);
     this.catalog.dropPages(threadId);
     this.leaves.delete(threadId);
     await this.catalog.refresh();

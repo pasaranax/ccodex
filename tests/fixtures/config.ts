@@ -18,6 +18,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     improveModelsFormatting: true,
     claudeVisualize: true,
     nativeMcp: false,
+    claudeIdleCompactionHoldMs: 86_400_000,
     ...overrides,
   };
 }
