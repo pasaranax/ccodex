@@ -124,20 +124,24 @@ describe("desktop stdio frontend", () => {
     const gateway = await startFakeGateway(path);
     const input = new PassThrough();
     const { output, text } = collector();
+    const appToolsOverride = "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true";
+    const startupOverrides: Array<readonly string[]> = [];
     const done = runStdioFrontend(config, path, {
       input,
       output,
-      kick: async () => undefined,
+      kick: async (_config: typeof config, overrides: readonly string[]) => { startupOverrides.push(overrides); },
       initialConnectDeadlineMs: 5_000,
       retryDelayMs: 20,
       configOverrides: [
         "features.code_mode_host=true",
         "mcp_servers.codex_app={ command=\"/app-tools/launch\", args=[\"./server.mjs\"], env={ CODEX_APP_TOOLS_PIPE_PATH=\"/tmp/app.sock\" } }",
+        appToolsOverride,
       ],
     });
 
     input.write('{"id":1,"method":"initialize"}\n');
     await waitFor(() => text().includes('{"id":1,"result":{}}\n'));
+    expect(startupOverrides).toEqual([[appToolsOverride]]);
     input.write(`${JSON.stringify({
       id: 2,
       method: "thread/resume",
@@ -155,6 +159,7 @@ describe("desktop stdio frontend", () => {
         threadId: "thread-1",
         config: {
           "features.code_mode_host": true,
+          "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled": true,
           "mcp_servers.codex_app": {
             command: "/app-tools/launch",
             args: ["./server.mjs"],

@@ -15,9 +15,13 @@ describe("a Claude session's commands", () => {
   it("finds the commands still in the session's process tree, not one it detached", async () => {
     const session = `test-${process.pid}-${Date.now()}`;
     const env = { ...process.env, CLAUDE_CODE_SESSION_ID: session, CLAUDE_PID: String(process.pid) };
-    const command = spawn("sleep", ["30"], { env });
+    // macOS ps hides the environment of protected system binaries such as /bin/sleep.
+    const keepAlive = "setTimeout(() => {}, 30_000)";
+    const command = spawn(process.execPath, ["-e", keepAlive], { env });
     // `nohup … &` from a shell: the command outlives the shell and is reparented away from the tree.
-    const detached = Number(spawnSync("sh", ["-c", "sleep 30 >/dev/null 2>&1 & echo $!"], { env, encoding: "utf8" }).stdout.trim());
+    const detached = Number(spawnSync("sh", [
+      "-c", '"$1" -e "$2" >/dev/null 2>&1 & echo $!', "sh", process.execPath, keepAlive,
+    ], { env, encoding: "utf8" }).stdout.trim());
     try {
       await sleep(100);
       const found = sessionProcesses().filter((entry) => entry.session === session).map((entry) => entry.pid);

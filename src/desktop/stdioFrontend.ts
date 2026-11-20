@@ -18,7 +18,7 @@ const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(reso
 export interface StdioFrontendDeps {
   readonly input?: NodeJS.ReadableStream;
   readonly output?: NodeJS.WritableStream;
-  readonly kick?: (config: Config) => Promise<void>;
+  readonly kick?: (config: Config, stockConfigOverrides: readonly string[]) => Promise<void>;
   readonly initialConnectDeadlineMs?: number;
   readonly retryDelayMs?: number;
   readonly configOverrides?: readonly string[];
@@ -51,9 +51,11 @@ function send(socket: WebSocket, line: string): Promise<void> {
   });
 }
 
-async function defaultKick(config: Config): Promise<void> {
+async function defaultKick(config: Config, stockConfigOverrides: readonly string[]): Promise<void> {
   try {
-    await runDaemonCommand(config, { command: "start", remoteControl: false, desktop: process.env.CODEX_APP_TOOLS_PIPE_PATH, app: true }, process.argv[1] ?? process.execPath);
+    await runDaemonCommand(config, {
+      command: "start", remoteControl: false, desktop: process.env.CODEX_APP_TOOLS_PIPE_PATH, app: true, stockConfigOverrides,
+    }, process.argv[1] ?? process.execPath);
   } catch (error) {
     process.stderr.write(`ccodex stdio frontend: gateway autostart failed: ${String(error)}\n`);
   }
@@ -79,7 +81,7 @@ class StdioFrontend {
     private readonly socketPath: string,
     private readonly input: NodeJS.ReadableStream,
     output: NodeJS.WritableStream,
-    private readonly kick: (config: Config) => Promise<void>,
+    private readonly kick: NonNullable<StdioFrontendDeps["kick"]>,
     private readonly initialConnectDeadlineMs: number,
     private readonly retryDelayMs: number,
     private readonly configOverrides: readonly string[],
@@ -116,7 +118,11 @@ class StdioFrontend {
   }
 
   private async connect(): Promise<WebSocket | undefined> {
-    await this.kick(this.config);
+    // Core can recover threads before Desktop sends any thread-scoped config.
+    const stockConfigOverrides = this.configOverrides.filter((override) =>
+      /^\s*plugins\.codex-app-tools@openai-bundled\.mcp_servers\.codex_app\.enabled\s*=\s*(true|false)\s*$/.test(override),
+    );
+    await this.kick(this.config, stockConfigOverrides);
     const deadline = Date.now() + this.initialConnectDeadlineMs;
     while (!this.inputEnded && !this.outputFailed && Date.now() < deadline) {
       try {

@@ -228,6 +228,7 @@ export async function spawnDetachedGateway(options: {
   readonly remoteControlEnabled: boolean;
   readonly desktop?: string;
   readonly app?: boolean;
+  readonly stockConfigOverrides?: readonly string[];
 }): Promise<number> {
   const token = randomUUID();
   const reservation = {
@@ -239,7 +240,11 @@ export async function spawnDetachedGateway(options: {
   atomicWrite(options.pidFile, reservation);
   mkdirSync(dirname(options.stderrLog), { recursive: true, mode: 0o700 });
   const stderr = openSync(options.stderrLog, "w", 0o600);
-  const args = [options.wrapperPath, "app-server"];
+  const args = [
+    options.wrapperPath,
+    ...options.stockConfigOverrides?.flatMap((override) => ["-c", override]) ?? [],
+    "app-server",
+  ];
   if (options.remoteControlEnabled) args.push("--remote-control");
   args.push("--listen", "unix://");
   const env = {

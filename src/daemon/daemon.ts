@@ -38,6 +38,7 @@ interface DaemonInvocation {
   readonly desktop?: string;
   /** Started by the Codex App on this machine (its stdio launch): the gateway runs the App's own Codex CLI. */
   readonly app?: boolean;
+  readonly stockConfigOverrides?: readonly string[];
 }
 
 interface DaemonPaths {
@@ -110,6 +111,7 @@ class HybridDaemon {
   private version?: Promise<string>;
   private desktop?: string;
   private app = false;
+  private stockConfigOverrides?: readonly string[];
 
   public constructor(private readonly config: Config, wrapperPath: string) {
     this.paths = paths(config, wrapperPath);
@@ -123,6 +125,7 @@ class HybridDaemon {
     if (invocation.command === "version") return this.versionOutput();
     this.desktop = invocation.desktop;
     this.app = invocation.app ?? false;
+    this.stockConfigOverrides = invocation.stockConfigOverrides;
     return withDaemonLock(this.paths.stateDirectory, async () => {
       switch (invocation.command) {
         case "bootstrap": return this.bootstrap(invocation.remoteControl);
@@ -179,6 +182,7 @@ class HybridDaemon {
       remoteControlEnabled: settings.remoteControlEnabled,
       desktop: this.desktop,
       app: this.app,
+      stockConfigOverrides: this.stockConfigOverrides,
     });
     const record = reconcileManagedProcess(this.paths.pidFile);
     if (!record || record.pid !== pid) throw new Error(`managed app server ${pid} lost daemon ownership during startup`);

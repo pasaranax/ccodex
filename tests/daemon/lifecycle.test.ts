@@ -91,6 +91,17 @@ async function startUnmanaged(config: Config, home: string, exitAfterProbe = fal
 }
 
 describe("npm-backed hybrid daemon lifecycle", () => {
+  it("passes Desktop app tools configuration to the gateway before any thread resumes", async () => {
+    const { config, record } = harness();
+    const appToolsOverride = "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true";
+    const desktop = { command: "start", remoteControl: false, app: true, stockConfigOverrides: [appToolsOverride] } as const;
+    await runDaemonCommand(config, desktop, fixture);
+
+    expect(JSON.parse(readFileSync(record, "utf8")).args).toEqual([
+      "-c", appToolsOverride, "app-server", "--listen", "unix://",
+    ]);
+  }, 20_000);
+
   it("matches Codex 0.153.3 wire shapes and cleans the detached process group", async () => {
     const { config, home, record } = harness();
     const run = (command: Parameters<typeof runDaemonCommand>[1]["command"], remoteControl = false) =>
