@@ -64,6 +64,18 @@ describe("gateway (black box: fake stock + fake Claude)", () => {
     expect(defaults.data.map((entry: any) => [entry.cwd, entry.skills.map((skill: any) => skill.name)])).toEqual([["/home/fake", ["ccodex:status", "stock-skill", "claude:review-pr"]]]);
   });
 
+  it("lists both providers' models when Desktop opens the picker in a Claude chat", async () => {
+    const models = await client.request("model/list", { modelProvider: "claude", includeHidden: true, cursor: null, limit: 100 });
+    expect(models.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ model: "gpt-6-luna", isDefault: true }),
+      expect.objectContaining({ model: CLAUDE, displayName: "Opus 5.5" }),
+    ]));
+  });
+
+  it("passes other explicit model providers to stock", async () => {
+    await expect(client.request("model/list", { modelProvider: "unknown" })).rejects.toThrow("Model provider unknown is not configured");
+  });
+
   it("points a Claude skill at Claude's file for it, or at a note, so a GPT chat mentioning it can read it", async () => {
     const project = join(gateway.root, "project");
     const file = join(project, ".claude", "skills", "review-pr", "SKILL.md");

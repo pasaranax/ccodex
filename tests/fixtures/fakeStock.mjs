@@ -251,7 +251,12 @@ const handlers = {
     if (params.sectionId) pinned.splice(params.beforeThreadId ? pinned.indexOf(params.beforeThreadId) : pinned.length, 0, params.threadId);
     return {};
   },
-  "model/list": () => ({ data: [{ id: "gpt-6-luna", model: "gpt-6-luna", displayName: "GPT-6 Luna", isDefault: true }], nextCursor: null }),
+  "model/list": (_connection, params) => {
+    if (params.modelProvider != null && params.modelProvider !== "openai") {
+      throw Object.assign(new Error(`Model provider ${params.modelProvider} is not configured`), { code: -32600 });
+    }
+    return { data: [{ id: "gpt-6-luna", model: "gpt-6-luna", displayName: "GPT-6 Luna", isDefault: true }], nextCursor: null };
+  },
   // Like stock: without cwds, the skills of its own cwd; Codex's bundled visualize skill while its plugin is there.
   "skills/list": (_connection, params) => {
     const visualize = join(process.env.CODEX_HOME ?? "/nonexistent", "plugins/cache/openai-bundled/visualize/1.0.0/skills/visualize/SKILL.md");

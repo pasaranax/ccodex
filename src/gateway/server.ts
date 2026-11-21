@@ -320,8 +320,10 @@ export class Gateway {
     on("thread/search", (connection, params) => this.catalog.search(connection, params));
     on("thread/loaded/list", (connection, params) => this.catalog.loaded(connection, params));
     on("model/list", async (connection, params) => {
+      // Desktop scopes the request to the chat's provider. Stock does not know about CCodex's Claude provider.
+      const { modelProvider, ...stockParams } = params;
       const [stock, claude] = await Promise.all([
-        connection.upstream.request("model/list", params),
+        connection.upstream.request("model/list", modelProvider === "claude" ? stockParams : params),
         params?.cursor ? Promise.resolve([]) : this.claude.models().catch(() => []),
       ]);
       return { ...stock, data: [...stock.data, ...claude] };
